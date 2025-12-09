@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { WeatherService, WeatherResponse } from './weather.service';
+import { WeatherService } from './weather.service';
+import { WeatherResponse, IconType } from './models/weather.model';
 
 export interface WeatherData {
   location: string;
@@ -53,7 +54,10 @@ export interface WeatherData {
         </div>
 
         <div class="weather-main">
-          <div class="weather-icon">{{ weatherData.icon }}</div>
+          <div class="weather-icon">
+            <span *ngIf="iconType === 'emoji'">{{ weatherData.icon }}</span>
+            <img *ngIf="iconType === 'image'" [src]="weatherData.icon" [alt]="weatherData.condition" class="weather-icon-img" />
+          </div>
           <div class="temperature">{{ weatherData.temperature }}°{{ unit }}</div>
         </div>
 
@@ -121,6 +125,14 @@ export class WeatherWidgetComponent implements OnInit {
   @Input()
   size: 'small' | 'medium' | 'large' = 'medium';
 
+  /** Icon type - emoji or image */
+  @Input()
+  iconType: IconType = 'emoji';
+
+  /** Base path for icon images (only used when iconType is 'image') */
+  @Input()
+  iconBasePath: string = 'assets/';
+
   currentDate: string = '';
   searchCity: string = '';
   loading: boolean = false;
@@ -131,6 +143,9 @@ export class WeatherWidgetComponent implements OnInit {
     this.updateCurrentDate();
     this.searchCity = this.initialCity;
     this.lastSearchedCity = this.initialCity;
+
+    // Configure icon type in service
+    this.weatherService.setIconType(this.iconType, this.iconBasePath);
 
     // Load weather data if real API is enabled
     if (this.useRealData && this.enableSearch) {

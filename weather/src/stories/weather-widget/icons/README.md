@@ -1,11 +1,11 @@
 # Weather Icons
 
-This folder is available for custom weather icons if you want to use images instead of emoji.
+The weather widget now supports both **emoji icons** and **custom image icons** (SVG/PNG).
 
-## Current Implementation
+## Icon Types
 
-The weather widget currently uses emoji icons mapped from OpenWeatherMap weather condition codes:
-
+### 1. Emoji Icons (Default)
+The widget uses emoji icons by default:
 - ☀️ Clear (day)
 - 🌙 Clear (night)
 - ⛅ Partly Cloudy
@@ -16,27 +16,74 @@ The weather widget currently uses emoji icons mapped from OpenWeatherMap weather
 - ❄️ Snow
 - 🌫️ Fog/Mist
 
-## Adding Custom Icons
+### 2. Custom Image Icons
+You can use custom SVG or PNG icons stored in the assets folder.
 
-To use custom icon images instead of emoji:
+## Usage
 
-1. Add your icon files to this folder (e.g., `sunny.svg`, `rainy.png`)
-
-2. Update the `getWeatherIcon()` method in `weather.service.ts`:
-
-```typescript
-private getWeatherIcon(weatherId: number, iconCode: string): string {
-  if (weatherId >= 200 && weatherId < 300) {
-    return '/assets/icons/thunderstorm.svg';
-  }
-  // ... etc
-}
+### Using Emoji Icons (Default)
+```html
+<weather-widget
+  [iconType]="'emoji'"
+  [useRealData]="true"
+  [enableSearch]="true">
+</weather-widget>
 ```
 
-3. Update the component template to use `<img>` tags:
-
+### Using Custom Image Icons
 ```html
-<img [src]="weatherData.icon" alt="Weather icon" class="weather-icon-img">
+<weather-widget
+  [iconType]="'image'"
+  [iconBasePath]="'assets/'"
+  [useRealData]="true"
+  [enableSearch]="true">
+</weather-widget>
+```
+
+### Available Icon Images
+The following SVG icons are available in `public/assets/` (copied from `/src/stories/assets/`):
+- `Sun.svg` - Clear day
+- `Moon.svg` - Clear night
+- `Cloud-Sun.svg` - Partly cloudy (day)
+- `Cloud-Moon.svg` - Partly cloudy (night)
+- `Cloud.svg` - Cloudy
+- `Cloud-Drizzle.svg` - Rain/Drizzle
+- `Cloud-Hail.svg` - Thunderstorm
+- `Cloud-Snow-Alt.svg` - Snow
+- `Cloud-Fog.svg` - Fog/Mist
+- `Wind.svg` - Windy
+
+## Icon Mapping
+
+The `WeatherService` automatically maps OpenWeatherMap weather condition codes to the appropriate icons based on the `iconType` setting:
+
+| Condition | Weather ID | Emoji | Image File |
+|-----------|-----------|-------|------------|
+| Thunderstorm | 200-299 | ⛈️ | Cloud-Hail.svg |
+| Drizzle | 300-399 | 🌦️ | Cloud-Drizzle.svg |
+| Rain | 500-599 | 🌧️ | Cloud-Drizzle.svg |
+| Snow | 600-699 | ❄️ | Cloud-Snow-Alt.svg |
+| Atmosphere | 700-799 | 🌫️ | Cloud-Fog.svg |
+| Clear (day) | 800 | ☀️ | Sun.svg |
+| Clear (night) | 800 | 🌙 | Moon.svg |
+| Few clouds (day) | 801 | ⛅ | Cloud-Sun.svg |
+| Few clouds (night) | 801 | ☁️ | Cloud-Moon.svg |
+| Clouds | 802-804 | ☁️ | Cloud.svg |
+
+## Programmatic Configuration
+
+You can also configure icon type programmatically via the `WeatherService`:
+
+```typescript
+import { WeatherService } from './weather.service';
+
+constructor(private weatherService: WeatherService) {
+  // Use image icons
+  this.weatherService.setIconType('image', 'assets/');
+  
+  // Or use emoji icons
+  this.weatherService.setIconType('emoji');
+}
 ```
 
 ## Icon Resources

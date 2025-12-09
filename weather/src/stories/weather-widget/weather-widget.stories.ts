@@ -33,6 +33,15 @@ const meta: Meta<WeatherWidgetComponent> = {
       options: ['small', 'medium', 'large'],
       description: 'Widget size',
     },
+    iconType: {
+      control: 'radio',
+      options: ['emoji', 'image'],
+      description: 'Icon type - emoji or custom images',
+    },
+    iconBasePath: {
+      control: 'text',
+      description: 'Base path for icon images (only used when iconType is "image")',
+    },
     enableSearch: {
       control: 'boolean',
       description: 'Enable city search and geolocation features',
@@ -317,6 +326,78 @@ export const MetricUnits: Story = {
     size: 'medium',
     enableSearch: false,
     useRealData: false,
+  },
+};
+
+/**
+ * Widget with custom SVG image icons
+ */
+export const WithImageIcons: Story = {
+  args: {
+    unit: 'C',
+    windUnit: 'km/h',
+    theme: 'dark',
+    size: 'large',
+    enableSearch: true,
+    useRealData: true,
+    initialCity: 'The Hague',
+    iconType: 'image',
+    iconBasePath: 'assets/',
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Widget using custom SVG icons instead of emoji. Icons are loaded from the assets folder.',
+      },
+    },
+  },
+};
+
+/**
+ * Sunny weather with image icon
+ */
+export const SunnyWithImage: Story = {
+  args: {
+    weatherData: {
+      location: 'Barcelona',
+      temperature: 28,
+      condition: 'Sunny',
+      humidity: 55,
+      windSpeed: 10,
+      icon: 'assets/Sun.svg',
+    },
+    unit: 'C',
+    windUnit: 'km/h',
+    theme: 'light',
+    size: 'medium',
+    enableSearch: false,
+    useRealData: false,
+    iconType: 'image',
+    iconBasePath: 'assets/',
+  },
+};
+
+/**
+ * Cloudy weather with image icon
+ */
+export const CloudyWithImage: Story = {
+  args: {
+    weatherData: {
+      location: 'London',
+      temperature: 18,
+      condition: 'Cloudy',
+      humidity: 75,
+      windSpeed: 15,
+      icon: 'assets/Cloud.svg',
+    },
+    unit: 'C',
+    windUnit: 'km/h',
+    theme: 'dark',
+    size: 'medium',
+    enableSearch: false,
+    useRealData: false,
+    iconType: 'image',
+    iconBasePath: 'assets/',
   },
 };
 

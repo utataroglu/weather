@@ -3,78 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
-
-// OpenWeatherMap API Raw Response Interface
-export interface OpenWeatherMapResponse {
-  coord: {
-    lon: number;
-    lat: number;
-  };
-  weather: Array<{
-    id: number;
-    main: string;
-    description: string;
-    icon: string;
-  }>;
-  base: string;
-  main: {
-    temp: number;
-    feels_like: number;
-    temp_min: number;
-    temp_max: number;
-    pressure: number;
-    humidity: number;
-    sea_level?: number;
-    grnd_level?: number;
-  };
-  visibility: number;
-  wind: {
-    speed: number;
-    deg: number;
-    gust?: number;
-  };
-  clouds: {
-    all: number;
-  };
-  dt: number;
-  sys: {
-    type?: number;
-    id?: number;
-    country: string;
-    sunrise: number;
-    sunset: number;
-  };
-  timezone: number;
-  id: number;
-  name: string;
-  cod: number;
-}
-
-// Transformed Weather Response (for component use)
-export interface WeatherResponse {
-  location: string;
-  temperature: number;
-  condition: string;
-  description: string;
-  humidity: number;
-  windSpeed: number;
-  icon: string;
-  feelsLike: number;
-  pressure: number;
-  visibility: number;
-  sunrise: number;
-  sunset: number;
-  forecast?: DailyForecast[];
-}
-
-export interface DailyForecast {
-  date: string;
-  tempMax: number;
-  tempMin: number;
-  condition: string;
-  icon: string;
-  humidity: number;
-}
+import { OpenWeatherMapResponse, WeatherResponse, DailyForecast, IconType } from './models/weather.model';
 
 @Injectable({
   providedIn: 'root'
@@ -103,7 +32,26 @@ export class WeatherService {
   private readonly corsProxy = environment.corsProxy?.trim() ?? '';
   private readonly configuredBaseUrl = environment.weatherApi?.baseUrl?.trim() ?? this.DEFAULT_BASE_URL;
 
+  // Icon configuration
+  private iconType: IconType = 'emoji';
+  private iconBasePath: string = 'assets/';
+
   constructor(private http: HttpClient) {}
+
+  /**
+   * Set the icon type (emoji or image)
+   */
+  setIconType(type: IconType, basePath: string = 'assets/'): void {
+    this.iconType = type;
+    this.iconBasePath = basePath.endsWith('/') ? basePath : `${basePath}/`;
+  }
+
+  /**
+   * Get current icon type
+   */
+  getIconType(): IconType {
+    return this.iconType;
+  }
 
   /**
    * Get weather data by city name
@@ -251,10 +199,21 @@ export class WeatherService {
   }
 
   /**
-   * Map OpenWeatherMap weather codes to emoji icons
+   * Map OpenWeatherMap weather codes to emoji icons or image paths
    * Weather condition codes: https://openweathermap.org/weather-conditions
    */
   private getWeatherIcon(weatherId: number, iconCode: string): string {
+    if (this.iconType === 'emoji') {
+      return this.getEmojiIcon(weatherId, iconCode);
+    } else {
+      return this.getImageIcon(weatherId, iconCode);
+    }
+  }
+
+  /**
+   * Get emoji icon based on weather condition
+   */
+  private getEmojiIcon(weatherId: number, iconCode: string): string {
     const isNight = iconCode.endsWith('n');
 
     if (weatherId >= this.THUNDERSTORM_MIN && weatherId < this.THUNDERSTORM_MAX) {
@@ -290,6 +249,55 @@ export class WeatherService {
     }
 
     return '⛅';
+  }
+
+  /**
+   * Get image path based on weather condition
+   */
+  private getImageIcon(weatherId: number, iconCode: string): string {
+    const isNight = iconCode.endsWith('n');
+
+    // Thunderstorm
+    if (weatherId >= this.THUNDERSTORM_MIN && weatherId < this.THUNDERSTORM_MAX) {
+      return `${this.iconBasePath}Cloud-Hail.svg`;
+    }
+
+    // Drizzle
+    if (weatherId >= this.DRIZZLE_MIN && weatherId < this.DRIZZLE_MAX) {
+      return `${this.iconBasePath}Cloud-Drizzle.svg`;
+    }
+
+    // Rain
+    if (weatherId >= this.RAIN_MIN && weatherId < this.RAIN_MAX) {
+      return `${this.iconBasePath}Cloud-Drizzle.svg`;
+    }
+
+    // Snow
+    if (weatherId >= this.SNOW_MIN && weatherId < this.SNOW_MAX) {
+      return `${this.iconBasePath}Cloud-Snow-Alt.svg`;
+    }
+
+    // Atmosphere (fog, mist, haze)
+    if (weatherId >= this.ATMOSPHERE_MIN && weatherId < this.ATMOSPHERE_MAX) {
+      return `${this.iconBasePath}Cloud-Fog.svg`;
+    }
+
+    // Clear sky
+    if (weatherId === this.CLEAR_SKY) {
+      return isNight ? `${this.iconBasePath}Moon.svg` : `${this.iconBasePath}Sun.svg`;
+    }
+
+    // Few clouds
+    if (weatherId === this.FEW_CLOUDS) {
+      return isNight ? `${this.iconBasePath}Cloud-Moon.svg` : `${this.iconBasePath}Cloud-Sun.svg`;
+    }
+
+    // Cloudy
+    if (weatherId > this.FEW_CLOUDS) {
+      return `${this.iconBasePath}Cloud.svg`;
+    }
+
+    return `${this.iconBasePath}Cloud-Sun.svg`;
   }
 
   /**

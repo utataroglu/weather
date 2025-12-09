@@ -10,6 +10,7 @@ const config: StorybookConfig = {
     "@storybook/addon-docs",
     "@storybook/addon-onboarding"
   ],
-  "framework": "@storybook/angular"
+  "framework": "@storybook/angular",
+  "staticDirs": ["../public"]
 };
 export default config;

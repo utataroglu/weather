@@ -250,14 +250,35 @@
 .weather-icon {
   font-size: 5em;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.weather-icon-img {
+  width: 160px;
+  height: 160px;
+  object-fit: contain;
+  filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.1));
 }
 
 .weather-widget--small .weather-icon {
   font-size: 3.5em;
 }
 
+.weather-widget--small .weather-icon-img {
+  width: 120px;
+  height: 120px;
+}
+
 .weather-widget--large .weather-icon {
   font-size: 6em;
+}
+
+.weather-widget--large .weather-icon-img {
+  width: 200px;
+  height: 200px;
 }
 
 .temperature {
@@ -265,6 +286,9 @@
   font-weight: 700;
   line-height: 1;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .weather-widget--small .temperature {
