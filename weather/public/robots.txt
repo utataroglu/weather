@@ -1,0 +1,13 @@
+# robots.txt for Weather App
+User-agent: *
+Allow: /
+
+# Disallow admin or private routes (if any exist)
+# Disallow: /admin/
+# Disallow: /private/
+
+# Sitemap location
+Sitemap: https://yourweatherapp.com/sitemap.xml
+
+# Crawl-delay (optional, in seconds)
+# Crawl-delay: 1

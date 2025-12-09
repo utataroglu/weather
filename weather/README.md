@@ -57,3 +57,33 @@ Angular CLI does not come with an end-to-end testing framework by default. You c
 ## Additional Resources
 
 For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+
+## Technologies Used
+* Angular 21 - Modern frontend framework with standalone components
+* TypeScript 5.9.2 - Strongly-typed JavaScript superset (target: ES2022)
+* RxJS 7.8 - Reactive programming with Observables for async data handling
+* Signals - Angular's new reactive primitives for state management
+* ES2022 - Modern JavaScript features (ES6+)
+* CSS3 - Component styling
+* Vitest 4.0 - Fast unit testing framework
+* Storybook 10.1 - Component development and documentation
+* Compodoc - Documentation generation for Angular applications
+* HTTP Client - Angular's built-in HTTP service for API calls
+* Prettier - Code formatting
+* Proxy Configuration - Development server proxy for API calls
+* SVG Assets - Scalable vector graphics for weather icons
+* NPM - Package management (v11.6.2)
+
+Build & Development Features
+* Code Splitting - Built-in with Angular's application builder
+* Optimization - Production builds with bundle budgets (500kB warning, 1MB error)
+* Output Hashing - Cache busting for production builds
+* Source Maps - Debugging support in development mode
+* Hot Module Replacement - Via Angular dev server
+
+Architecture Patterns
+* Standalone Components - Modern Angular architecture without NgModules
+* Service-based Architecture - WeatherService for API integration
+* Component-based UI - Reusable components (WeatherWidget, Header, Button, Page)
+* TypeScript Strict Mode - Enhanced type safety and code quality
+* Reactive Programming - RxJS operators (map, catchError) for data transformation

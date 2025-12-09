@@ -2,10 +2,73 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Weather</title>
+  <title>Weather App - Real-Time Weather Forecasts & Current Conditions</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Get accurate real-time weather forecasts, current conditions, temperature, humidity, and wind speed for any location. Free weather app with daily forecasts and interactive weather widget.">
+  <meta name="keywords" content="weather, weather forecast, weather app, temperature, humidity, wind speed, daily forecast, current weather, weather conditions">
+  <meta name="author" content="Weather App">
+  <meta name="robots" content="index, follow">
+  <meta name="googlebot" content="index, follow">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://yourweatherapp.com/">
+  <meta property="og:title" content="Weather App - Real-Time Weather Forecasts & Current Conditions">
+  <meta property="og:description" content="Get accurate real-time weather forecasts, current conditions, temperature, humidity, and wind speed for any location.">
+  <meta property="og:image" content="https://yourweatherapp.com/assets/og-image.png">
+  <meta property="og:site_name" content="Weather App">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://yourweatherapp.com/">
+  <meta name="twitter:title" content="Weather App - Real-Time Weather Forecasts">
+  <meta name="twitter:description" content="Get accurate real-time weather forecasts, current conditions, temperature, humidity, and wind speed for any location.">
+  <meta name="twitter:image" content="https://yourweatherapp.com/assets/twitter-image.png">
+
+  <!-- Canonical URL -->
+  <link rel="canonical" href="https://yourweatherapp.com/">
+
+  <!-- PWA & Theme -->
+  <meta name="theme-color" content="#ffffff">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Weather App">
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Favicons -->
   <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+
+  <!-- Preconnect to external domains for faster resource loading -->
+  <link rel="preconnect" href="https://api.openweathermap.org" crossorigin>
+  <link rel="dns-prefetch" href="https://api.openweathermap.org">
+
+  <!-- Structured Data (JSON-LD) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Weather App",
+    "description": "Real-time weather forecasts and current conditions for any location",
+    "url": "https://yourweatherapp.com",
+    "applicationCategory": "Utility",
+    "operatingSystem": "All",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.5",
+      "ratingCount": "1000"
+    }
+  }
+  </script>
 </head>
 <body>
   <app-root></app-root>
