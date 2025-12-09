@@ -70,6 +70,15 @@ export interface DailyForecast {
   humidity: number;
 }
 
+export interface WeatherData {
+  location: string;
+  temperature: number;
+  condition: string;
+  humidity: number;
+  windSpeed: number;
+  icon: string;
+}
+
 export type IconType = 'emoji' | 'image';
 
 export interface WeatherIconConfig {

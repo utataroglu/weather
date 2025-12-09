@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/angular';
-import { WeatherWidgetComponent, WeatherData } from './weather-widget.component';
+import { WeatherWidgetComponent } from './weather-widget.component';
+import { WeatherData } from './models/weather.model';
 import { provideHttpClient } from '@angular/common/http';
 import { applicationConfig } from '@storybook/angular';
 

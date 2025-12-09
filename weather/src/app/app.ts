@@ -1,7 +1,7 @@
 import { Component, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { provideHttpClient } from '@angular/common/http';
-import { WeatherWidgetComponent, WeatherData } from '../stories/weather-widget/weather-widget.component';
+import { WeatherWidgetComponent} from '../stories/weather-widget/weather-widget.component';
+import { WeatherData } from '../stories/weather-widget/models/weather.model';
 
 @Component({
   selector: 'app-root',
