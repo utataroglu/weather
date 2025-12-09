@@ -83,7 +83,7 @@
               "-d",
               "."
             ],
-            "port": 6006
+            "port": 4200
           }
         },
         "build-storybook": {

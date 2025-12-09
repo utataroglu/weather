@@ -14,9 +14,10 @@ export const environment = {
   // 1. https://api.allorigins.win/raw?url= (free, no auth required)
   // 2. https://corsproxy.io/? (free, no auth required)
   // 3. Deploy your own: https://github.com/Rob--W/cors-anywhere
+
   corsProxy: 'https://api.allorigins.win/raw?url=',
 
-  // Alternative: Use Angular proxy configuration (recommended for development)
+  // Use Angular proxy configuration (recommended for development)
   // See proxy.conf.json
   useProxy: false,
 };

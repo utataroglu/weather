@@ -147,8 +147,8 @@ export class WeatherWidgetComponent implements OnInit {
     // Configure icon type in service
     this.weatherService.setIconType(this.iconType, this.iconBasePath);
 
-    // Load weather data if real API is enabled
-    if (this.useRealData && this.enableSearch) {
+    // Load initial city weather if real API is enabled
+    if (this.useRealData) {
       this.loadWeather(this.initialCity);
     }
   }
@@ -217,8 +217,17 @@ export class WeatherWidgetComponent implements OnInit {
     const units = this.unit === 'C' ? 'metric' : 'imperial';
 
     this.weatherService.getWeatherByCity(city, units).subscribe({
-      next: (data) => this.handleWeatherData(data),
-      error: (err) => this.handleError(err)
+      next: (data) => {
+        console.log('Weather data received:', data);
+        this.handleWeatherData(data);
+      },
+      error: (err) => {
+        console.error('Weather service error:', err);
+        this.handleError(err);
+      },
+      complete: () => {
+        console.log('Weather request completed');
+      }
     });
   }
 
@@ -243,8 +252,30 @@ export class WeatherWidgetComponent implements OnInit {
    */
   private handleError(err: any) {
     this.loading = false;
-    this.error = err.message || 'Failed to load weather data';
-    console.error('Weather widget error:', err);
+
+    // Log the full error for debugging
+    console.error('Full error object:', err);
+
+    // Provide specific error messages based on error type
+    if (err.status === 404) {
+      this.error = `City "${this.lastSearchedCity}" not found. Please check the spelling and try again.`;
+    } else if (err.status === 401 || err.status === 403) {
+      this.error = 'API authentication failed. Please check your API key configuration.';
+    } else if (err.status === 429) {
+      this.error = 'Too many requests. Please wait a moment and try again.';
+    } else if (err.status >= 500) {
+      this.error = 'Weather service is currently unavailable. Please try again later.';
+    } else if (err.status === 0) {
+      this.error = 'Network error. Please check your internet connection.';
+    } else if (err.message) {
+      this.error = err.message;
+    } else if (err.error?.message) {
+      this.error = err.error.message;
+    } else {
+      this.error = 'Failed to load weather data. Please try again.';
+    }
+
+    console.error('Weather widget error:', this.error);
   }
 
   /**
