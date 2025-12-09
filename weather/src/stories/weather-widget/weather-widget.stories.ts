@@ -73,9 +73,9 @@ const defaultWeatherData: WeatherData = {
 export const Default: Story = {
   args: {
     weatherData: defaultWeatherData,
-    unit: 'F',
-    windUnit: 'mph',
-    theme: 'light',
+    unit: 'C',
+    windUnit: 'km/h',
+    theme: 'dark',
     size: 'medium',
     enableSearch: false,
     useRealData: false,
@@ -111,13 +111,13 @@ export const WithSearch: Story = {
  */
 export const WithRealAPI: Story = {
   args: {
-    unit: 'F',
-    windUnit: 'mph',
+    unit: 'C',
+    windUnit: 'km/h',
     theme: 'dark',
     size: 'large',
     enableSearch: true,
     useRealData: true,
-    initialCity: 'London',
+    initialCity: 'The Hague',
   },
   parameters: {
     docs: {
@@ -134,15 +134,15 @@ export const WithRealAPI: Story = {
 export const Sunny: Story = {
   args: {
     weatherData: {
-      location: 'Los Angeles',
-      temperature: 85,
+      location: 'Antalya',
+      temperature: 35,
       condition: 'Sunny',
       humidity: 45,
       windSpeed: 8,
       icon: '☀️',
     },
-    unit: 'F',
-    windUnit: 'mph',
+    unit: 'C',
+    windUnit: 'km/h',
     theme: 'light',
     size: 'medium',
     enableSearch: false,
@@ -156,8 +156,8 @@ export const Sunny: Story = {
 export const Rainy: Story = {
   args: {
     weatherData: {
-      location: 'Seattle',
-      temperature: 58,
+      location: 'Dublin',
+      temperature: 30,
       condition: 'Rainy',
       humidity: 85,
       windSpeed: 15,
@@ -178,15 +178,15 @@ export const Rainy: Story = {
 export const Snowy: Story = {
   args: {
     weatherData: {
-      location: 'New York',
-      temperature: 28,
+      location: 'Bursa',
+      temperature: 15,
       condition: 'Snowy',
       humidity: 75,
       windSpeed: 20,
       icon: '❄️',
     },
-    unit: 'F',
-    windUnit: 'mph',
+    unit: 'C',
+    windUnit: 'km/h',
     theme: 'light',
     size: 'medium',
     enableSearch: false,
@@ -200,8 +200,8 @@ export const Snowy: Story = {
 export const Cloudy: Story = {
   args: {
     weatherData: {
-      location: 'London',
-      temperature: 15,
+      location: 'Giresun',
+      temperature: 20,
       condition: 'Cloudy',
       humidity: 70,
       windSpeed: 18,
@@ -244,8 +244,8 @@ export const Stormy: Story = {
 export const DarkTheme: Story = {
   args: {
     weatherData: defaultWeatherData,
-    unit: 'F',
-    windUnit: 'mph',
+    unit: 'C',
+    windUnit: 'km/h',
     theme: 'dark',
     size: 'medium',
     enableSearch: false,
@@ -259,8 +259,8 @@ export const DarkTheme: Story = {
 export const GradientTheme: Story = {
   args: {
     weatherData: defaultWeatherData,
-    unit: 'F',
-    windUnit: 'mph',
+    unit: 'C',
+    windUnit: 'km/h',
     theme: 'gradient',
     size: 'medium',
     enableSearch: false,
@@ -274,8 +274,8 @@ export const GradientTheme: Story = {
 export const SmallSize: Story = {
   args: {
     weatherData: defaultWeatherData,
-    unit: 'F',
-    windUnit: 'mph',
+    unit: 'C',
+    windUnit: 'km/h',
     theme: 'light',
     size: 'small',
     enableSearch: false,
@@ -289,8 +289,8 @@ export const SmallSize: Story = {
 export const LargeSize: Story = {
   args: {
     weatherData: defaultWeatherData,
-    unit: 'F',
-    windUnit: 'mph',
+    unit: 'C',
+    windUnit: 'km/h',
     theme: 'light',
     size: 'large',
     enableSearch: false,
@@ -326,8 +326,8 @@ export const MetricUnits: Story = {
 export const Loading: Story = {
   args: {
     weatherData: defaultWeatherData,
-    unit: 'F',
-    windUnit: 'mph',
+    unit: 'C',
+    windUnit: 'km/h',
     theme: 'dark',
     size: 'medium',
     enableSearch: true,

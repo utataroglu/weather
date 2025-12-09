@@ -1,7 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { HttpClientModule } from '@angular/common/http';
 import { WeatherService, WeatherResponse } from './weather.service';
 
 export interface WeatherData {
@@ -16,7 +15,7 @@ export interface WeatherData {
 @Component({
   selector: 'weather-widget',
   standalone: true,
-  imports: [CommonModule, FormsModule, HttpClientModule],
+  imports: [CommonModule, FormsModule],
   providers: [WeatherService],
   template: `
     <div class="weather-widget" [ngClass]="themeClass">
@@ -81,7 +80,7 @@ export interface WeatherData {
   styleUrls: ['./weather-widget.css'],
 })
 export class WeatherWidgetComponent implements OnInit {
-  private weatherService = inject(WeatherService);
+  private readonly weatherService = inject(WeatherService);
 
   /** Enable search functionality */
   @Input()
@@ -142,7 +141,7 @@ export class WeatherWidgetComponent implements OnInit {
   /**
    * Search weather by city name
    */
-  searchWeather() {
+  searchWeather(): void {
     if (!this.searchCity.trim()) {
       this.error = 'Please enter a city name';
       return;
@@ -153,7 +152,7 @@ export class WeatherWidgetComponent implements OnInit {
   /**
    * Get weather for current location using geolocation
    */
-  async getCurrentLocationWeather() {
+  async getCurrentLocationWeather(): Promise<void> {
     this.loading = true;
     this.error = '';
 
@@ -166,16 +165,16 @@ export class WeatherWidgetComponent implements OnInit {
           next: (data) => this.handleWeatherData(data),
           error: (err) => this.handleError(err)
         });
-    } catch (err: any) {
+    } catch (err) {
       this.loading = false;
-      this.error = err.message || 'Unable to get your location';
+      this.error = err instanceof Error ? err.message : 'Unable to get your location';
     }
   }
 
   /**
    * Refresh current weather data
    */
-  refreshWeather() {
+  refreshWeather(): void {
     if (this.lastSearchedCity) {
       this.loadWeather(this.lastSearchedCity);
     }
@@ -184,7 +183,7 @@ export class WeatherWidgetComponent implements OnInit {
   /**
    * Retry after error
    */
-  retry() {
+  retry(): void {
     if (this.lastSearchedCity) {
       this.loadWeather(this.lastSearchedCity);
     } else {

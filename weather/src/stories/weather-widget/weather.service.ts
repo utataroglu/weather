@@ -4,6 +4,53 @@ import { Observable, throwError } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 
+// OpenWeatherMap API Raw Response Interface
+export interface OpenWeatherMapResponse {
+  coord: {
+    lon: number;
+    lat: number;
+  };
+  weather: Array<{
+    id: number;
+    main: string;
+    description: string;
+    icon: string;
+  }>;
+  base: string;
+  main: {
+    temp: number;
+    feels_like: number;
+    temp_min: number;
+    temp_max: number;
+    pressure: number;
+    humidity: number;
+    sea_level?: number;
+    grnd_level?: number;
+  };
+  visibility: number;
+  wind: {
+    speed: number;
+    deg: number;
+    gust?: number;
+  };
+  clouds: {
+    all: number;
+  };
+  dt: number;
+  sys: {
+    type?: number;
+    id?: number;
+    country: string;
+    sunrise: number;
+    sunset: number;
+  };
+  timezone: number;
+  id: number;
+  name: string;
+  cod: number;
+}
+
+// Transformed Weather Response (for component use)
 export interface WeatherResponse {
   location: string;
   temperature: number;
@@ -33,6 +80,20 @@ export interface DailyForecast {
   providedIn: 'root'
 })
 export class WeatherService {
+  // Weather condition code ranges
+  private readonly THUNDERSTORM_MIN = 200;
+  private readonly THUNDERSTORM_MAX = 300;
+  private readonly DRIZZLE_MIN = 300;
+  private readonly DRIZZLE_MAX = 400;
+  private readonly RAIN_MIN = 500;
+  private readonly RAIN_MAX = 600;
+  private readonly SNOW_MIN = 600;
+  private readonly SNOW_MAX = 700;
+  private readonly ATMOSPHERE_MIN = 700;
+  private readonly ATMOSPHERE_MAX = 800;
+  private readonly CLEAR_SKY = 800;
+  private readonly FEW_CLOUDS = 801;
+
   // Base URLs when using proxy vs direct calls
   private readonly PROXY_BASE_URL = '/api/data/2.5';
   private readonly DEFAULT_BASE_URL = 'https://api.openweathermap.org/data/2.5';
@@ -58,7 +119,7 @@ export class WeatherService {
       appid: this.apiKey
     });
 
-    return this.http.get<any>(url).pipe(
+    return this.http.get<OpenWeatherMapResponse>(url).pipe(
       map(data => this.transformWeatherData(data, units)),
       catchError(this.handleError)
     );
@@ -79,7 +140,7 @@ export class WeatherService {
       appid: this.apiKey
     });
 
-    return this.http.get<any>(url).pipe(
+    return this.http.get<OpenWeatherMapResponse>(url).pipe(
       map(data => this.transformWeatherData(data, units)),
       catchError(this.handleError)
     );
@@ -112,19 +173,27 @@ export class WeatherService {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         reject(new Error('Geolocation is not supported by your browser'));
-      } else {
-        navigator.geolocation.getCurrentPosition(
-          position => resolve(position.coords),
-          error => reject(error)
-        );
+        return;
       }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => resolve(position.coords),
+        (error) => {
+          const errorMessages: Record<number, string> = {
+            [error.PERMISSION_DENIED]: 'Location permission denied',
+            [error.POSITION_UNAVAILABLE]: 'Location information unavailable',
+            [error.TIMEOUT]: 'Location request timed out'
+          };
+          reject(new Error(errorMessages[error.code] || 'Failed to get location'));
+        }
+      );
     });
   }
 
   /**
    * Transform OpenWeatherMap API response to our WeatherResponse format
    */
-  private transformWeatherData(data: any, units: string): WeatherResponse {
+  private transformWeatherData(data: OpenWeatherMapResponse, units: string): WeatherResponse {
     // Validate required data exists
     if (!data || !data.main || !data.weather || !data.weather[0] || !data.wind || !data.sys) {
       throw new Error('Invalid API response structure');
@@ -186,59 +255,63 @@ export class WeatherService {
    * Weather condition codes: https://openweathermap.org/weather-conditions
    */
   private getWeatherIcon(weatherId: number, iconCode: string): string {
-    // Check if it's night time (icon code ends with 'n')
     const isNight = iconCode.endsWith('n');
 
-    if (weatherId >= 200 && weatherId < 300) {
-      return '⛈️'; // Thunderstorm
-    } else if (weatherId >= 300 && weatherId < 400) {
-      return '🌦️'; // Drizzle
-    } else if (weatherId >= 500 && weatherId < 600) {
-      return '🌧️'; // Rain
-    } else if (weatherId >= 600 && weatherId < 700) {
-      return '❄️'; // Snow
-    } else if (weatherId >= 700 && weatherId < 800) {
-      return '🌫️'; // Atmosphere (mist, fog, etc.)
-    } else if (weatherId === 800) {
-      return isNight ? '🌙' : '☀️'; // Clear
-    } else if (weatherId === 801) {
-      return isNight ? '☁️' : '⛅'; // Few clouds
-    } else if (weatherId > 801) {
-      return '☁️'; // Cloudy
+    if (weatherId >= this.THUNDERSTORM_MIN && weatherId < this.THUNDERSTORM_MAX) {
+      return '⛈️';
     }
 
-    return '⛅'; // Default
+    if (weatherId >= this.DRIZZLE_MIN && weatherId < this.DRIZZLE_MAX) {
+      return '🌦️';
+    }
+
+    if (weatherId >= this.RAIN_MIN && weatherId < this.RAIN_MAX) {
+      return '🌧️';
+    }
+
+    if (weatherId >= this.SNOW_MIN && weatherId < this.SNOW_MAX) {
+      return '❄️';
+    }
+
+    if (weatherId >= this.ATMOSPHERE_MIN && weatherId < this.ATMOSPHERE_MAX) {
+      return '🌫️';
+    }
+
+    if (weatherId === this.CLEAR_SKY) {
+      return isNight ? '🌙' : '☀️';
+    }
+
+    if (weatherId === this.FEW_CLOUDS) {
+      return isNight ? '☁️' : '⛅';
+    }
+
+    if (weatherId > this.FEW_CLOUDS) {
+      return '☁️';
+    }
+
+    return '⛅';
   }
 
   /**
    * Handle HTTP errors
    */
-  private handleError(error: any): Observable<never> {
+  private handleError = (error: any): Observable<never> => {
     let errorMessage = 'An error occurred while fetching weather data';
 
     if (error.error instanceof ErrorEvent) {
-      // Client-side error
       errorMessage = `Error: ${error.error.message}`;
     } else if (error.status) {
-      // Server-side error
-      switch (error.status) {
-        case 401:
-          errorMessage = 'Invalid API key';
-          break;
-        case 404:
-          errorMessage = 'City not found';
-          break;
-        case 429:
-          errorMessage = 'API rate limit exceeded';
-          break;
-        default:
-          errorMessage = `Error: ${error.message}`;
-      }
+      const statusMessages: Record<number, string> = {
+        401: 'Invalid API key',
+        404: 'City not found',
+        429: 'API rate limit exceeded'
+      };
+      errorMessage = statusMessages[error.status] || `Error: ${error.message}`;
     }
 
     console.error('Weather API Error:', error);
     return throwError(() => new Error(errorMessage));
-  }
+  };
 
   /**
    * Build the API URL depending on proxy/cors configuration

@@ -3,12 +3,12 @@
     "interfaces": [
         {
             "name": "DailyForecast",
-            "id": "interface-DailyForecast-5e6e2244a6cfb29b4d94de83b9e3d023a3cad9cd8ce52febd669874cf18a00a62980016db8fdb6145960d74aca672d1bb9b4e973c1e1e4711a524722d5192c95",
+            "id": "interface-DailyForecast-bcbe1430a6d0afe15ecb713649060156344daba3f2f565796dd78da0f6fc50cadf28ab9e3a0816c42978729d5de8669453cfcbbc3237da3cc534d0a52fdd582e",
             "file": "src/stories/weather-widget/weather.service.ts",
             "deprecated": false,
             "deprecationMessage": "",
             "type": "interface",
-            "sourceCode": "import { Injectable } from '@angular/core';\nimport { HttpClient } from '@angular/common/http';\nimport { Observable, throwError } from 'rxjs';\nimport { map, catchError } from 'rxjs/operators';\n\nexport interface WeatherResponse {\n  location: string;\n  temperature: number;\n  condition: string;\n  description: string;\n  humidity: number;\n  windSpeed: number;\n  icon: string;\n  feelsLike: number;\n  pressure: number;\n  visibility: number;\n  sunrise: number;\n  sunset: number;\n  forecast?: DailyForecast[];\n}\n\nexport interface DailyForecast {\n  date: string;\n  tempMax: number;\n  tempMin: number;\n  condition: string;\n  icon: string;\n  humidity: number;\n}\n\n@Injectable({\n  providedIn: 'root'\n})\nexport class WeatherService {\n  // OpenWeatherMap API configuration\n  private readonly API_KEY = '9a755e38ff059806bf283e3174fdeae7';\n  private readonly BASE_URL = 'https://api.openweathermap.org/data/2.5';\n\n  // CORS proxy - you can use cors-anywhere or similar\n  // Option 1: Use a public CORS proxy (not recommended for production)\n  private readonly CORS_PROXY = 'https://api.allorigins.win/raw?url=';\n\n  // Option 2: For development, you can also use: 'https://corsproxy.io/?'\n  // private readonly CORS_PROXY = 'https://corsproxy.io/?';\n\n  constructor(private http: HttpClient) {}\n\n  /**\n   * Get weather data by city name\n   */\n  getWeatherByCity(city: string, units: 'metric' | 'imperial' = 'imperial'): Observable<WeatherResponse> {\n    const url = `${this.BASE_URL}/weather?q=${encodeURIComponent(city)}&appid=${this.API_KEY}&units=${units}`;\n    const proxiedUrl = `${this.CORS_PROXY}${encodeURIComponent(url)}`;\n\n    return this.http.get<any>(proxiedUrl).pipe(\n      map(data => this.transformWeatherData(data, units)),\n      catchError(this.handleError)\n    );\n  }\n\n  /**\n   * Get weather data by coordinates\n   */\n  getWeatherByCoordinates(lat: number, lon: number, units: 'metric' | 'imperial' = 'imperial'): Observable<WeatherResponse> {\n    const url = `${this.BASE_URL}/weather?lat=${lat}&lon=${lon}&appid=${this.API_KEY}&units=${units}`;\n    const proxiedUrl = `${this.CORS_PROXY}${encodeURIComponent(url)}`;\n\n    return this.http.get<any>(proxiedUrl).pipe(\n      map(data => this.transformWeatherData(data, units)),\n      catchError(this.handleError)\n    );\n  }\n\n  /**\n   * Get 5-day weather forecast\n   */\n  getForecast(city: string, units: 'metric' | 'imperial' = 'imperial'): Observable<DailyForecast[]> {\n    const url = `${this.BASE_URL}/forecast?q=${encodeURIComponent(city)}&appid=${this.API_KEY}&units=${units}`;\n    const proxiedUrl = `${this.CORS_PROXY}${encodeURIComponent(url)}`;\n\n    return this.http.get<any>(proxiedUrl).pipe(\n      map(data => this.transformForecastData(data)),\n      catchError(this.handleError)\n    );\n  }\n\n  /**\n   * Get current position using browser geolocation\n   */\n  getCurrentPosition(): Promise<GeolocationCoordinates> {\n    return new Promise((resolve, reject) => {\n      if (!navigator.geolocation) {\n        reject(new Error('Geolocation is not supported by your browser'));\n      } else {\n        navigator.geolocation.getCurrentPosition(\n          position => resolve(position.coords),\n          error => reject(error)\n        );\n      }\n    });\n  }\n\n  /**\n   * Transform OpenWeatherMap API response to our WeatherResponse format\n   */\n  private transformWeatherData(data: any, units: string): WeatherResponse {\n    // Validate required data exists\n    if (!data || !data.main || !data.weather || !data.weather[0] || !data.wind || !data.sys) {\n      throw new Error('Invalid API response structure');\n    }\n\n    return {\n      location: `${data.name || 'Unknown'}${data.sys?.country ? ', ' + data.sys.country : ''}`,\n      temperature: Math.round(data.main.temp),\n      condition: data.weather[0].main,\n      description: data.weather[0].description,\n      humidity: data.main.humidity,\n      windSpeed: Math.round(data.wind.speed),\n      icon: this.getWeatherIcon(data.weather[0].id, data.weather[0].icon),\n      feelsLike: Math.round(data.main.feels_like),\n      pressure: data.main.pressure,\n      visibility: data.visibility || 0,\n      sunrise: data.sys.sunrise || 0,\n      sunset: data.sys.sunset || 0\n    };\n  }\n\n  /**\n   * Transform forecast data\n   */\n  private transformForecastData(data: any): DailyForecast[] {\n    const dailyData: { [key: string]: any[] } = {};\n\n    // Group forecasts by day\n    data.list.forEach((item: any) => {\n      const date = new Date(item.dt * 1000).toLocaleDateString();\n      if (!dailyData[date]) {\n        dailyData[date] = [];\n      }\n      dailyData[date].push(item);\n    });\n\n    // Get daily summary (first 5 days)\n    return Object.entries(dailyData).slice(0, 5).map(([date, items]) => {\n      const temps = items.map(item => item.main.temp);\n      const mainItem = items[Math.floor(items.length / 2)]; // Use midday data\n\n      return {\n        date,\n        tempMax: Math.round(Math.max(...temps)),\n        tempMin: Math.round(Math.min(...temps)),\n        condition: mainItem.weather[0].main,\n        icon: this.getWeatherIcon(mainItem.weather[0].id, mainItem.weather[0].icon),\n        humidity: mainItem.main.humidity\n      };\n    });\n  }\n\n  /**\n   * Map OpenWeatherMap weather codes to emoji icons\n   * Weather condition codes: https://openweathermap.org/weather-conditions\n   */\n  private getWeatherIcon(weatherId: number, iconCode: string): string {\n    // Check if it's night time (icon code ends with 'n')\n    const isNight = iconCode.endsWith('n');\n\n    if (weatherId >= 200 && weatherId < 300) {\n      return '⛈️'; // Thunderstorm\n    } else if (weatherId >= 300 && weatherId < 400) {\n      return '🌦️'; // Drizzle\n    } else if (weatherId >= 500 && weatherId < 600) {\n      return '🌧️'; // Rain\n    } else if (weatherId >= 600 && weatherId < 700) {\n      return '❄️'; // Snow\n    } else if (weatherId >= 700 && weatherId < 800) {\n      return '🌫️'; // Atmosphere (mist, fog, etc.)\n    } else if (weatherId === 800) {\n      return isNight ? '🌙' : '☀️'; // Clear\n    } else if (weatherId === 801) {\n      return isNight ? '☁️' : '⛅'; // Few clouds\n    } else if (weatherId > 801) {\n      return '☁️'; // Cloudy\n    }\n\n    return '⛅'; // Default\n  }\n\n  /**\n   * Handle HTTP errors\n   */\n  private handleError(error: any): Observable<never> {\n    let errorMessage = 'An error occurred while fetching weather data';\n\n    if (error.error instanceof ErrorEvent) {\n      // Client-side error\n      errorMessage = `Error: ${error.error.message}`;\n    } else if (error.status) {\n      // Server-side error\n      switch (error.status) {\n        case 401:\n          errorMessage = 'Invalid API key';\n          break;\n        case 404:\n          errorMessage = 'City not found';\n          break;\n        case 429:\n          errorMessage = 'API rate limit exceeded';\n          break;\n        default:\n          errorMessage = `Error: ${error.message}`;\n      }\n    }\n\n    console.error('Weather API Error:', error);\n    return throwError(() => new Error(errorMessage));\n  }\n}\n",
+            "sourceCode": "import { Injectable } from '@angular/core';\nimport { HttpClient } from '@angular/common/http';\nimport { Observable, throwError } from 'rxjs';\nimport { map, catchError } from 'rxjs/operators';\nimport { environment } from '../../environments/environment';\n\nexport interface WeatherResponse {\n  location: string;\n  temperature: number;\n  condition: string;\n  description: string;\n  humidity: number;\n  windSpeed: number;\n  icon: string;\n  feelsLike: number;\n  pressure: number;\n  visibility: number;\n  sunrise: number;\n  sunset: number;\n  forecast?: DailyForecast[];\n}\n\nexport interface DailyForecast {\n  date: string;\n  tempMax: number;\n  tempMin: number;\n  condition: string;\n  icon: string;\n  humidity: number;\n}\n\n@Injectable({\n  providedIn: 'root'\n})\nexport class WeatherService {\n  // Base URLs when using proxy vs direct calls\n  private readonly PROXY_BASE_URL = '/api/data/2.5';\n  private readonly DEFAULT_BASE_URL = 'https://api.openweathermap.org/data/2.5';\n\n  private readonly apiKey = environment.weatherApi?.key?.trim() ?? '';\n  private readonly useProxy = environment.useProxy === true;\n  private readonly corsProxy = environment.corsProxy?.trim() ?? '';\n  private readonly configuredBaseUrl = environment.weatherApi?.baseUrl?.trim() ?? this.DEFAULT_BASE_URL;\n\n  constructor(private http: HttpClient) {}\n\n  /**\n   * Get weather data by city name\n   */\n  getWeatherByCity(city: string, units: 'metric' | 'imperial' = 'imperial'): Observable<WeatherResponse> {\n    if (!this.isApiKeyConfigured()) {\n      return throwError(() => new Error('Weather API key is not configured. Please update environment.weatherApi.key.'));\n    }\n\n    const url = this.buildApiUrl('/weather', {\n      q: city,\n      units,\n      appid: this.apiKey\n    });\n\n    return this.http.get<any>(url).pipe(\n      map(data => this.transformWeatherData(data, units)),\n      catchError(this.handleError)\n    );\n  }\n\n  /**\n   * Get weather data by coordinates\n   */\n  getWeatherByCoordinates(lat: number, lon: number, units: 'metric' | 'imperial' = 'imperial'): Observable<WeatherResponse> {\n    if (!this.isApiKeyConfigured()) {\n      return throwError(() => new Error('Weather API key is not configured. Please update environment.weatherApi.key.'));\n    }\n\n    const url = this.buildApiUrl('/weather', {\n      lat,\n      lon,\n      units,\n      appid: this.apiKey\n    });\n\n    return this.http.get<any>(url).pipe(\n      map(data => this.transformWeatherData(data, units)),\n      catchError(this.handleError)\n    );\n  }\n\n  /**\n   * Get 5-day weather forecast\n   */\n  getForecast(city: string, units: 'metric' | 'imperial' = 'imperial'): Observable<DailyForecast[]> {\n    if (!this.isApiKeyConfigured()) {\n      return throwError(() => new Error('Weather API key is not configured. Please update environment.weatherApi.key.'));\n    }\n\n    const url = this.buildApiUrl('/forecast', {\n      q: city,\n      units,\n      appid: this.apiKey\n    });\n\n    return this.http.get<any>(url).pipe(\n      map(data => this.transformForecastData(data)),\n      catchError(this.handleError)\n    );\n  }\n\n  /**\n   * Get current position using browser geolocation\n   */\n  getCurrentPosition(): Promise<GeolocationCoordinates> {\n    return new Promise((resolve, reject) => {\n      if (!navigator.geolocation) {\n        reject(new Error('Geolocation is not supported by your browser'));\n      } else {\n        navigator.geolocation.getCurrentPosition(\n          position => resolve(position.coords),\n          error => reject(error)\n        );\n      }\n    });\n  }\n\n  /**\n   * Transform OpenWeatherMap API response to our WeatherResponse format\n   */\n  private transformWeatherData(data: any, units: string): WeatherResponse {\n    // Validate required data exists\n    if (!data || !data.main || !data.weather || !data.weather[0] || !data.wind || !data.sys) {\n      throw new Error('Invalid API response structure');\n    }\n\n    return {\n      location: `${data.name || 'Unknown'}${data.sys?.country ? ', ' + data.sys.country : ''}`,\n      temperature: Math.round(data.main.temp),\n      condition: data.weather[0].main,\n      description: data.weather[0].description,\n      humidity: data.main.humidity,\n      windSpeed: Math.round(data.wind.speed),\n      icon: this.getWeatherIcon(data.weather[0].id, data.weather[0].icon),\n      feelsLike: Math.round(data.main.feels_like),\n      pressure: data.main.pressure,\n      visibility: data.visibility || 0,\n      sunrise: data.sys.sunrise || 0,\n      sunset: data.sys.sunset || 0\n    };\n  }\n\n  /**\n   * Transform forecast data\n   */\n  private transformForecastData(data: any): DailyForecast[] {\n    if (!data || !Array.isArray(data.list)) {\n      throw new Error('Invalid forecast API response structure');\n    }\n\n    const dailyData: { [key: string]: any[] } = {};\n\n    // Group forecasts by day\n    data.list.forEach((item: any) => {\n      const date = new Date(item.dt * 1000).toISOString().split('T')[0];\n      if (!dailyData[date]) {\n        dailyData[date] = [];\n      }\n      dailyData[date].push(item);\n    });\n\n    // Get daily summary (first 5 days)\n    return Object.entries(dailyData).slice(0, 5).map(([date, items]) => {\n      const temps = items.map(item => item.main.temp);\n      const mainItem = items[Math.floor(items.length / 2)]; // Use midday data\n\n      return {\n        date,\n        tempMax: Math.round(Math.max(...temps)),\n        tempMin: Math.round(Math.min(...temps)),\n        condition: mainItem.weather[0].main,\n        icon: this.getWeatherIcon(mainItem.weather[0].id, mainItem.weather[0].icon),\n        humidity: mainItem.main.humidity\n      };\n    });\n  }\n\n  /**\n   * Map OpenWeatherMap weather codes to emoji icons\n   * Weather condition codes: https://openweathermap.org/weather-conditions\n   */\n  private getWeatherIcon(weatherId: number, iconCode: string): string {\n    // Check if it's night time (icon code ends with 'n')\n    const isNight = iconCode.endsWith('n');\n\n    if (weatherId >= 200 && weatherId < 300) {\n      return '⛈️'; // Thunderstorm\n    } else if (weatherId >= 300 && weatherId < 400) {\n      return '🌦️'; // Drizzle\n    } else if (weatherId >= 500 && weatherId < 600) {\n      return '🌧️'; // Rain\n    } else if (weatherId >= 600 && weatherId < 700) {\n      return '❄️'; // Snow\n    } else if (weatherId >= 700 && weatherId < 800) {\n      return '🌫️'; // Atmosphere (mist, fog, etc.)\n    } else if (weatherId === 800) {\n      return isNight ? '🌙' : '☀️'; // Clear\n    } else if (weatherId === 801) {\n      return isNight ? '☁️' : '⛅'; // Few clouds\n    } else if (weatherId > 801) {\n      return '☁️'; // Cloudy\n    }\n\n    return '⛅'; // Default\n  }\n\n  /**\n   * Handle HTTP errors\n   */\n  private handleError(error: any): Observable<never> {\n    let errorMessage = 'An error occurred while fetching weather data';\n\n    if (error.error instanceof ErrorEvent) {\n      // Client-side error\n      errorMessage = `Error: ${error.error.message}`;\n    } else if (error.status) {\n      // Server-side error\n      switch (error.status) {\n        case 401:\n          errorMessage = 'Invalid API key';\n          break;\n        case 404:\n          errorMessage = 'City not found';\n          break;\n        case 429:\n          errorMessage = 'API rate limit exceeded';\n          break;\n        default:\n          errorMessage = `Error: ${error.message}`;\n      }\n    }\n\n    console.error('Weather API Error:', error);\n    return throwError(() => new Error(errorMessage));\n  }\n\n  /**\n   * Build the API URL depending on proxy/cors configuration\n   */\n  private buildApiUrl(endpoint: string, params: Record<string, string | number>): string {\n    const base = this.useProxy ? this.PROXY_BASE_URL : this.configuredBaseUrl;\n    const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base;\n    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;\n\n    const urlParams = new URLSearchParams();\n    Object.entries(params).forEach(([key, value]) => {\n      urlParams.set(key, String(value));\n    });\n\n    const apiUrl = `${normalizedBase}${normalizedEndpoint}?${urlParams.toString()}`;\n\n    if (this.useProxy || !this.corsProxy) {\n      return apiUrl;\n    }\n\n    // When not using proxy, optionally prepend configured CORS proxy\n    if (this.corsProxy.includes('{url}')) {\n      return this.corsProxy.replace('{url}', encodeURIComponent(apiUrl));\n    }\n\n    const shouldEncode = this.corsProxy.endsWith('=') || this.corsProxy.includes('?url=');\n    return shouldEncode\n      ? `${this.corsProxy}${encodeURIComponent(apiUrl)}`\n      : `${this.corsProxy}${apiUrl}`;\n  }\n\n  private isApiKeyConfigured(): boolean {\n    return !!this.apiKey && this.apiKey !== 'YOUR_OPENWEATHERMAP_API_KEY';\n  }\n}\n",
             "properties": [
                 {
                     "name": "condition",
@@ -18,7 +18,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 26
+                    "line": 27
                 },
                 {
                     "name": "date",
@@ -28,7 +28,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 23
+                    "line": 24
                 },
                 {
                     "name": "humidity",
@@ -38,7 +38,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 28
+                    "line": 29
                 },
                 {
                     "name": "icon",
@@ -48,7 +48,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 27
+                    "line": 28
                 },
                 {
                     "name": "tempMax",
@@ -58,7 +58,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 24
+                    "line": 25
                 },
                 {
                     "name": "tempMin",
@@ -68,7 +68,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 25
+                    "line": 26
                 }
             ],
             "indexSignatures": [],
@@ -103,12 +103,12 @@
         },
         {
             "name": "WeatherData",
-            "id": "interface-WeatherData-4feedb40e9852d2a7d133b81b540de9983363ef68e28b59f5aa51388346c6d1c5dd438bfd4384fb1ecfbf211c4cefb046d569a9796d8cfb175df230a7fbd2d89",
+            "id": "interface-WeatherData-fc0a4dcf6eac2139c87a1d55577cfac18a40b39b3ff4346f2e2a0642057135eb13a7809cb7a6a9401038588e9d7b46a1de9f08122fd7a0f1db504f539add65aa",
             "file": "src/stories/weather-widget/weather-widget.component.ts",
             "deprecated": false,
             "deprecationMessage": "",
             "type": "interface",
-            "sourceCode": "import { CommonModule } from '@angular/common';\nimport { Component, Input, OnInit, inject } from '@angular/core';\nimport { FormsModule } from '@angular/forms';\nimport { HttpClientModule } from '@angular/common/http';\nimport { WeatherService, WeatherResponse } from './weather.service';\n\nexport interface WeatherData {\n  location: string;\n  temperature: number;\n  condition: string;\n  humidity: number;\n  windSpeed: number;\n  icon: string;\n}\n\n@Component({\n  selector: 'weather-widget',\n  standalone: true,\n  imports: [CommonModule, FormsModule, HttpClientModule],\n  providers: [WeatherService],\n  template: `\n    <div class=\"weather-widget\" [ngClass]=\"themeClass\">\n      <!-- Search Bar -->\n      <div class=\"weather-search\" *ngIf=\"enableSearch\">\n        <input\n          type=\"text\"\n          [(ngModel)]=\"searchCity\"\n          (keyup.enter)=\"searchWeather()\"\n          placeholder=\"Enter city name...\"\n          class=\"search-input\"\n        />\n        <button (click)=\"searchWeather()\" class=\"search-button\">🔍</button>\n        <button (click)=\"getCurrentLocationWeather()\" class=\"location-button\" title=\"Use my location\">📍</button>\n      </div>\n\n      <!-- Loading State -->\n      <div *ngIf=\"loading\" class=\"weather-loading\">\n        <div class=\"spinner\"></div>\n        <p>Loading weather data...</p>\n      </div>\n\n      <!-- Error State -->\n      <div *ngIf=\"error && !loading\" class=\"weather-error\">\n        <span class=\"error-icon\">⚠️</span>\n        <p>{{ error }}</p>\n        <button (click)=\"retry()\" class=\"retry-button\">Try Again</button>\n      </div>\n\n      <!-- Weather Content -->\n      <div *ngIf=\"!loading && !error\" class=\"weather-content\">\n        <div class=\"weather-header\">\n          <h2 class=\"location\">{{ weatherData.location }}</h2>\n          <span class=\"date\">{{ currentDate }}</span>\n        </div>\n\n        <div class=\"weather-main\">\n          <div class=\"weather-icon\">{{ weatherData.icon }}</div>\n          <div class=\"temperature\">{{ weatherData.temperature }}°{{ unit }}</div>\n        </div>\n\n        <div class=\"weather-condition\">{{ weatherData.condition }}</div>\n\n        <div class=\"weather-details\">\n          <div class=\"detail-item\">\n            <span class=\"detail-label\">Humidity</span>\n            <span class=\"detail-value\">{{ weatherData.humidity }}%</span>\n          </div>\n          <div class=\"detail-item\">\n            <span class=\"detail-label\">Wind Speed</span>\n            <span class=\"detail-value\">{{ weatherData.windSpeed }} {{ windUnit }}</span>\n          </div>\n        </div>\n\n        <!-- Refresh Button -->\n        <button *ngIf=\"enableSearch\" (click)=\"refreshWeather()\" class=\"refresh-button\" title=\"Refresh\">\n          🔄\n        </button>\n      </div>\n    </div>\n  `,\n  styleUrls: ['./weather-widget.css'],\n})\nexport class WeatherWidgetComponent implements OnInit {\n  private weatherService = inject(WeatherService);\n\n  /** Enable search functionality */\n  @Input()\n  enableSearch: boolean = false;\n\n  /** Initial city to load */\n  @Input()\n  initialCity: string = 'The Hague';\n\n  /** Use real API data (if false, uses mock data) */\n  @Input()\n  useRealData: boolean = false;\n\n  /** Weather data to display */\n  @Input()\n  weatherData: WeatherData = {\n    location: 'The Hague',\n    temperature: 72,\n    condition: 'Partly Cloudy',\n    humidity: 65,\n    windSpeed: 12,\n    icon: '⛅',\n  };\n\n  /** Temperature unit (C or F) */\n  @Input()\n  unit: 'C' | 'F' = 'F';\n\n  /** Wind speed unit */\n  @Input()\n  windUnit: 'mph' | 'km/h' = 'mph';\n\n  /** Theme of the widget */\n  @Input()\n  theme: 'light' | 'dark' | 'gradient' = 'light';\n\n  /** Widget size */\n  @Input()\n  size: 'small' | 'medium' | 'large' = 'medium';\n\n  currentDate: string = '';\n  searchCity: string = '';\n  loading: boolean = false;\n  error: string = '';\n  lastSearchedCity: string = '';\n\n  ngOnInit() {\n    this.updateCurrentDate();\n    this.searchCity = this.initialCity;\n    this.lastSearchedCity = this.initialCity;\n\n    // Load weather data if real API is enabled\n    if (this.useRealData && this.enableSearch) {\n      this.loadWeather(this.initialCity);\n    }\n  }\n\n  /**\n   * Search weather by city name\n   */\n  searchWeather() {\n    if (!this.searchCity.trim()) {\n      this.error = 'Please enter a city name';\n      return;\n    }\n    this.loadWeather(this.searchCity.trim());\n  }\n\n  /**\n   * Get weather for current location using geolocation\n   */\n  async getCurrentLocationWeather() {\n    this.loading = true;\n    this.error = '';\n\n    try {\n      const coords = await this.weatherService.getCurrentPosition();\n      const units = this.unit === 'C' ? 'metric' : 'imperial';\n\n      this.weatherService.getWeatherByCoordinates(coords.latitude, coords.longitude, units)\n        .subscribe({\n          next: (data) => this.handleWeatherData(data),\n          error: (err) => this.handleError(err)\n        });\n    } catch (err: any) {\n      this.loading = false;\n      this.error = err.message || 'Unable to get your location';\n    }\n  }\n\n  /**\n   * Refresh current weather data\n   */\n  refreshWeather() {\n    if (this.lastSearchedCity) {\n      this.loadWeather(this.lastSearchedCity);\n    }\n  }\n\n  /**\n   * Retry after error\n   */\n  retry() {\n    if (this.lastSearchedCity) {\n      this.loadWeather(this.lastSearchedCity);\n    } else {\n      this.error = '';\n    }\n  }\n\n  /**\n   * Load weather data from API\n   */\n  private loadWeather(city: string) {\n    this.loading = true;\n    this.error = '';\n    this.lastSearchedCity = city;\n\n    const units = this.unit === 'C' ? 'metric' : 'imperial';\n\n    this.weatherService.getWeatherByCity(city, units).subscribe({\n      next: (data) => this.handleWeatherData(data),\n      error: (err) => this.handleError(err)\n    });\n  }\n\n  /**\n   * Handle successful weather data response\n   */\n  private handleWeatherData(data: WeatherResponse) {\n    this.weatherData = {\n      location: data.location,\n      temperature: data.temperature,\n      condition: data.condition,\n      humidity: data.humidity,\n      windSpeed: data.windSpeed,\n      icon: data.icon\n    };\n    this.loading = false;\n    this.error = '';\n  }\n\n  /**\n   * Handle API errors\n   */\n  private handleError(err: any) {\n    this.loading = false;\n    this.error = err.message || 'Failed to load weather data';\n    console.error('Weather widget error:', err);\n  }\n\n  /**\n   * Update current date display\n   */\n  private updateCurrentDate() {\n    this.currentDate = new Date().toLocaleDateString('en-US', {\n      weekday: 'long',\n      year: 'numeric',\n      month: 'long',\n      day: 'numeric',\n    });\n  }\n\n  get themeClass(): string {\n    return `weather-widget--${this.theme} weather-widget--${this.size}`;\n  }\n}\n",
+            "sourceCode": "import { CommonModule } from '@angular/common';\nimport { Component, Input, OnInit, inject } from '@angular/core';\nimport { FormsModule } from '@angular/forms';\nimport { WeatherService, WeatherResponse } from './weather.service';\n\nexport interface WeatherData {\n  location: string;\n  temperature: number;\n  condition: string;\n  humidity: number;\n  windSpeed: number;\n  icon: string;\n}\n\n@Component({\n  selector: 'weather-widget',\n  standalone: true,\n  imports: [CommonModule, FormsModule],\n  providers: [WeatherService],\n  template: `\n    <div class=\"weather-widget\" [ngClass]=\"themeClass\">\n      <!-- Search Bar -->\n      <div class=\"weather-search\" *ngIf=\"enableSearch\">\n        <input\n          type=\"text\"\n          [(ngModel)]=\"searchCity\"\n          (keyup.enter)=\"searchWeather()\"\n          placeholder=\"Enter city name...\"\n          class=\"search-input\"\n        />\n        <button (click)=\"searchWeather()\" class=\"search-button\">🔍</button>\n        <button (click)=\"getCurrentLocationWeather()\" class=\"location-button\" title=\"Use my location\">📍</button>\n      </div>\n\n      <!-- Loading State -->\n      <div *ngIf=\"loading\" class=\"weather-loading\">\n        <div class=\"spinner\"></div>\n        <p>Loading weather data...</p>\n      </div>\n\n      <!-- Error State -->\n      <div *ngIf=\"error && !loading\" class=\"weather-error\">\n        <span class=\"error-icon\">⚠️</span>\n        <p>{{ error }}</p>\n        <button (click)=\"retry()\" class=\"retry-button\">Try Again</button>\n      </div>\n\n      <!-- Weather Content -->\n      <div *ngIf=\"!loading && !error\" class=\"weather-content\">\n        <div class=\"weather-header\">\n          <h2 class=\"location\">{{ weatherData.location }}</h2>\n          <span class=\"date\">{{ currentDate }}</span>\n        </div>\n\n        <div class=\"weather-main\">\n          <div class=\"weather-icon\">{{ weatherData.icon }}</div>\n          <div class=\"temperature\">{{ weatherData.temperature }}°{{ unit }}</div>\n        </div>\n\n        <div class=\"weather-condition\">{{ weatherData.condition }}</div>\n\n        <div class=\"weather-details\">\n          <div class=\"detail-item\">\n            <span class=\"detail-label\">Humidity</span>\n            <span class=\"detail-value\">{{ weatherData.humidity }}%</span>\n          </div>\n          <div class=\"detail-item\">\n            <span class=\"detail-label\">Wind Speed</span>\n            <span class=\"detail-value\">{{ weatherData.windSpeed }} {{ windUnit }}</span>\n          </div>\n        </div>\n\n        <!-- Refresh Button -->\n        <button *ngIf=\"enableSearch\" (click)=\"refreshWeather()\" class=\"refresh-button\" title=\"Refresh\">\n          🔄\n        </button>\n      </div>\n    </div>\n  `,\n  styleUrls: ['./weather-widget.css'],\n})\nexport class WeatherWidgetComponent implements OnInit {\n  private weatherService = inject(WeatherService);\n\n  /** Enable search functionality */\n  @Input()\n  enableSearch: boolean = false;\n\n  /** Initial city to load */\n  @Input()\n  initialCity: string = 'The Hague';\n\n  /** Use real API data (if false, uses mock data) */\n  @Input()\n  useRealData: boolean = false;\n\n  /** Weather data to display */\n  @Input()\n  weatherData: WeatherData = {\n    location: 'The Hague',\n    temperature: 5,\n    condition: 'Partly Cloudy',\n    humidity: 65,\n    windSpeed: 12,\n    icon: '⛅',\n  };\n\n  /** Temperature unit (C or F) */\n  @Input()\n  unit: 'C' | 'F' = 'F';\n\n  /** Wind speed unit */\n  @Input()\n  windUnit: 'mph' | 'km/h' = 'km/h';\n\n  /** Theme of the widget */\n  @Input()\n  theme: 'light' | 'dark' | 'gradient' = 'light';\n\n  /** Widget size */\n  @Input()\n  size: 'small' | 'medium' | 'large' = 'medium';\n\n  currentDate: string = '';\n  searchCity: string = '';\n  loading: boolean = false;\n  error: string = '';\n  lastSearchedCity: string = '';\n\n  ngOnInit() {\n    this.updateCurrentDate();\n    this.searchCity = this.initialCity;\n    this.lastSearchedCity = this.initialCity;\n\n    // Load weather data if real API is enabled\n    if (this.useRealData && this.enableSearch) {\n      this.loadWeather(this.initialCity);\n    }\n  }\n\n  /**\n   * Search weather by city name\n   */\n  searchWeather() {\n    if (!this.searchCity.trim()) {\n      this.error = 'Please enter a city name';\n      return;\n    }\n    this.loadWeather(this.searchCity.trim());\n  }\n\n  /**\n   * Get weather for current location using geolocation\n   */\n  async getCurrentLocationWeather() {\n    this.loading = true;\n    this.error = '';\n\n    try {\n      const coords = await this.weatherService.getCurrentPosition();\n      const units = this.unit === 'C' ? 'metric' : 'imperial';\n\n      this.weatherService.getWeatherByCoordinates(coords.latitude, coords.longitude, units)\n        .subscribe({\n          next: (data) => this.handleWeatherData(data),\n          error: (err) => this.handleError(err)\n        });\n    } catch (err: any) {\n      this.loading = false;\n      this.error = err.message || 'Unable to get your location';\n    }\n  }\n\n  /**\n   * Refresh current weather data\n   */\n  refreshWeather() {\n    if (this.lastSearchedCity) {\n      this.loadWeather(this.lastSearchedCity);\n    }\n  }\n\n  /**\n   * Retry after error\n   */\n  retry() {\n    if (this.lastSearchedCity) {\n      this.loadWeather(this.lastSearchedCity);\n    } else {\n      this.error = '';\n    }\n  }\n\n  /**\n   * Load weather data from API\n   */\n  private loadWeather(city: string) {\n    this.loading = true;\n    this.error = '';\n    this.lastSearchedCity = city;\n\n    const units = this.unit === 'C' ? 'metric' : 'imperial';\n\n    this.weatherService.getWeatherByCity(city, units).subscribe({\n      next: (data) => this.handleWeatherData(data),\n      error: (err) => this.handleError(err)\n    });\n  }\n\n  /**\n   * Handle successful weather data response\n   */\n  private handleWeatherData(data: WeatherResponse) {\n    this.weatherData = {\n      location: data.location,\n      temperature: data.temperature,\n      condition: data.condition,\n      humidity: data.humidity,\n      windSpeed: data.windSpeed,\n      icon: data.icon\n    };\n    this.loading = false;\n    this.error = '';\n  }\n\n  /**\n   * Handle API errors\n   */\n  private handleError(err: any) {\n    this.loading = false;\n    this.error = err.message || 'Failed to load weather data';\n    console.error('Weather widget error:', err);\n  }\n\n  /**\n   * Update current date display\n   */\n  private updateCurrentDate() {\n    this.currentDate = new Date().toLocaleDateString('en-US', {\n      weekday: 'long',\n      year: 'numeric',\n      month: 'long',\n      day: 'numeric',\n    });\n  }\n\n  get themeClass(): string {\n    return `weather-widget--${this.theme} weather-widget--${this.size}`;\n  }\n}\n",
             "properties": [
                 {
                     "name": "condition",
@@ -118,7 +118,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 10
+                    "line": 9
                 },
                 {
                     "name": "humidity",
@@ -128,122 +128,17 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 11
+                    "line": 10
                 },
                 {
                     "name": "icon",
                     "deprecated": false,
                     "deprecationMessage": "",
                     "type": "string",
-                    "indexKey": "",
-                    "optional": false,
-                    "description": "",
-                    "line": 13
-                },
-                {
-                    "name": "location",
-                    "deprecated": false,
-                    "deprecationMessage": "",
-                    "type": "string",
-                    "indexKey": "",
-                    "optional": false,
-                    "description": "",
-                    "line": 8
-                },
-                {
-                    "name": "temperature",
-                    "deprecated": false,
-                    "deprecationMessage": "",
-                    "type": "number",
-                    "indexKey": "",
-                    "optional": false,
-                    "description": "",
-                    "line": 9
-                },
-                {
-                    "name": "windSpeed",
-                    "deprecated": false,
-                    "deprecationMessage": "",
-                    "type": "number",
                     "indexKey": "",
                     "optional": false,
                     "description": "",
                     "line": 12
-                }
-            ],
-            "indexSignatures": [],
-            "kind": 172,
-            "methods": [],
-            "extends": []
-        },
-        {
-            "name": "WeatherResponse",
-            "id": "interface-WeatherResponse-5e6e2244a6cfb29b4d94de83b9e3d023a3cad9cd8ce52febd669874cf18a00a62980016db8fdb6145960d74aca672d1bb9b4e973c1e1e4711a524722d5192c95",
-            "file": "src/stories/weather-widget/weather.service.ts",
-            "deprecated": false,
-            "deprecationMessage": "",
-            "type": "interface",
-            "sourceCode": "import { Injectable } from '@angular/core';\nimport { HttpClient } from '@angular/common/http';\nimport { Observable, throwError } from 'rxjs';\nimport { map, catchError } from 'rxjs/operators';\n\nexport interface WeatherResponse {\n  location: string;\n  temperature: number;\n  condition: string;\n  description: string;\n  humidity: number;\n  windSpeed: number;\n  icon: string;\n  feelsLike: number;\n  pressure: number;\n  visibility: number;\n  sunrise: number;\n  sunset: number;\n  forecast?: DailyForecast[];\n}\n\nexport interface DailyForecast {\n  date: string;\n  tempMax: number;\n  tempMin: number;\n  condition: string;\n  icon: string;\n  humidity: number;\n}\n\n@Injectable({\n  providedIn: 'root'\n})\nexport class WeatherService {\n  // OpenWeatherMap API configuration\n  private readonly API_KEY = '9a755e38ff059806bf283e3174fdeae7';\n  private readonly BASE_URL = 'https://api.openweathermap.org/data/2.5';\n\n  // CORS proxy - you can use cors-anywhere or similar\n  // Option 1: Use a public CORS proxy (not recommended for production)\n  private readonly CORS_PROXY = 'https://api.allorigins.win/raw?url=';\n\n  // Option 2: For development, you can also use: 'https://corsproxy.io/?'\n  // private readonly CORS_PROXY = 'https://corsproxy.io/?';\n\n  constructor(private http: HttpClient) {}\n\n  /**\n   * Get weather data by city name\n   */\n  getWeatherByCity(city: string, units: 'metric' | 'imperial' = 'imperial'): Observable<WeatherResponse> {\n    const url = `${this.BASE_URL}/weather?q=${encodeURIComponent(city)}&appid=${this.API_KEY}&units=${units}`;\n    const proxiedUrl = `${this.CORS_PROXY}${encodeURIComponent(url)}`;\n\n    return this.http.get<any>(proxiedUrl).pipe(\n      map(data => this.transformWeatherData(data, units)),\n      catchError(this.handleError)\n    );\n  }\n\n  /**\n   * Get weather data by coordinates\n   */\n  getWeatherByCoordinates(lat: number, lon: number, units: 'metric' | 'imperial' = 'imperial'): Observable<WeatherResponse> {\n    const url = `${this.BASE_URL}/weather?lat=${lat}&lon=${lon}&appid=${this.API_KEY}&units=${units}`;\n    const proxiedUrl = `${this.CORS_PROXY}${encodeURIComponent(url)}`;\n\n    return this.http.get<any>(proxiedUrl).pipe(\n      map(data => this.transformWeatherData(data, units)),\n      catchError(this.handleError)\n    );\n  }\n\n  /**\n   * Get 5-day weather forecast\n   */\n  getForecast(city: string, units: 'metric' | 'imperial' = 'imperial'): Observable<DailyForecast[]> {\n    const url = `${this.BASE_URL}/forecast?q=${encodeURIComponent(city)}&appid=${this.API_KEY}&units=${units}`;\n    const proxiedUrl = `${this.CORS_PROXY}${encodeURIComponent(url)}`;\n\n    return this.http.get<any>(proxiedUrl).pipe(\n      map(data => this.transformForecastData(data)),\n      catchError(this.handleError)\n    );\n  }\n\n  /**\n   * Get current position using browser geolocation\n   */\n  getCurrentPosition(): Promise<GeolocationCoordinates> {\n    return new Promise((resolve, reject) => {\n      if (!navigator.geolocation) {\n        reject(new Error('Geolocation is not supported by your browser'));\n      } else {\n        navigator.geolocation.getCurrentPosition(\n          position => resolve(position.coords),\n          error => reject(error)\n        );\n      }\n    });\n  }\n\n  /**\n   * Transform OpenWeatherMap API response to our WeatherResponse format\n   */\n  private transformWeatherData(data: any, units: string): WeatherResponse {\n    // Validate required data exists\n    if (!data || !data.main || !data.weather || !data.weather[0] || !data.wind || !data.sys) {\n      throw new Error('Invalid API response structure');\n    }\n\n    return {\n      location: `${data.name || 'Unknown'}${data.sys?.country ? ', ' + data.sys.country : ''}`,\n      temperature: Math.round(data.main.temp),\n      condition: data.weather[0].main,\n      description: data.weather[0].description,\n      humidity: data.main.humidity,\n      windSpeed: Math.round(data.wind.speed),\n      icon: this.getWeatherIcon(data.weather[0].id, data.weather[0].icon),\n      feelsLike: Math.round(data.main.feels_like),\n      pressure: data.main.pressure,\n      visibility: data.visibility || 0,\n      sunrise: data.sys.sunrise || 0,\n      sunset: data.sys.sunset || 0\n    };\n  }\n\n  /**\n   * Transform forecast data\n   */\n  private transformForecastData(data: any): DailyForecast[] {\n    const dailyData: { [key: string]: any[] } = {};\n\n    // Group forecasts by day\n    data.list.forEach((item: any) => {\n      const date = new Date(item.dt * 1000).toLocaleDateString();\n      if (!dailyData[date]) {\n        dailyData[date] = [];\n      }\n      dailyData[date].push(item);\n    });\n\n    // Get daily summary (first 5 days)\n    return Object.entries(dailyData).slice(0, 5).map(([date, items]) => {\n      const temps = items.map(item => item.main.temp);\n      const mainItem = items[Math.floor(items.length / 2)]; // Use midday data\n\n      return {\n        date,\n        tempMax: Math.round(Math.max(...temps)),\n        tempMin: Math.round(Math.min(...temps)),\n        condition: mainItem.weather[0].main,\n        icon: this.getWeatherIcon(mainItem.weather[0].id, mainItem.weather[0].icon),\n        humidity: mainItem.main.humidity\n      };\n    });\n  }\n\n  /**\n   * Map OpenWeatherMap weather codes to emoji icons\n   * Weather condition codes: https://openweathermap.org/weather-conditions\n   */\n  private getWeatherIcon(weatherId: number, iconCode: string): string {\n    // Check if it's night time (icon code ends with 'n')\n    const isNight = iconCode.endsWith('n');\n\n    if (weatherId >= 200 && weatherId < 300) {\n      return '⛈️'; // Thunderstorm\n    } else if (weatherId >= 300 && weatherId < 400) {\n      return '🌦️'; // Drizzle\n    } else if (weatherId >= 500 && weatherId < 600) {\n      return '🌧️'; // Rain\n    } else if (weatherId >= 600 && weatherId < 700) {\n      return '❄️'; // Snow\n    } else if (weatherId >= 700 && weatherId < 800) {\n      return '🌫️'; // Atmosphere (mist, fog, etc.)\n    } else if (weatherId === 800) {\n      return isNight ? '🌙' : '☀️'; // Clear\n    } else if (weatherId === 801) {\n      return isNight ? '☁️' : '⛅'; // Few clouds\n    } else if (weatherId > 801) {\n      return '☁️'; // Cloudy\n    }\n\n    return '⛅'; // Default\n  }\n\n  /**\n   * Handle HTTP errors\n   */\n  private handleError(error: any): Observable<never> {\n    let errorMessage = 'An error occurred while fetching weather data';\n\n    if (error.error instanceof ErrorEvent) {\n      // Client-side error\n      errorMessage = `Error: ${error.error.message}`;\n    } else if (error.status) {\n      // Server-side error\n      switch (error.status) {\n        case 401:\n          errorMessage = 'Invalid API key';\n          break;\n        case 404:\n          errorMessage = 'City not found';\n          break;\n        case 429:\n          errorMessage = 'API rate limit exceeded';\n          break;\n        default:\n          errorMessage = `Error: ${error.message}`;\n      }\n    }\n\n    console.error('Weather API Error:', error);\n    return throwError(() => new Error(errorMessage));\n  }\n}\n",
-            "properties": [
-                {
-                    "name": "condition",
-                    "deprecated": false,
-                    "deprecationMessage": "",
-                    "type": "string",
-                    "indexKey": "",
-                    "optional": false,
-                    "description": "",
-                    "line": 9
-                },
-                {
-                    "name": "description",
-                    "deprecated": false,
-                    "deprecationMessage": "",
-                    "type": "string",
-                    "indexKey": "",
-                    "optional": false,
-                    "description": "",
-                    "line": 10
-                },
-                {
-                    "name": "feelsLike",
-                    "deprecated": false,
-                    "deprecationMessage": "",
-                    "type": "number",
-                    "indexKey": "",
-                    "optional": false,
-                    "description": "",
-                    "line": 14
-                },
-                {
-                    "name": "forecast",
-                    "deprecated": false,
-                    "deprecationMessage": "",
-                    "type": "DailyForecast[]",
-                    "indexKey": "",
-                    "optional": true,
-                    "description": "",
-                    "line": 19
-                },
-                {
-                    "name": "humidity",
-                    "deprecated": false,
-                    "deprecationMessage": "",
-                    "type": "number",
-                    "indexKey": "",
-                    "optional": false,
-                    "description": "",
-                    "line": 11
-                },
-                {
-                    "name": "icon",
-                    "deprecated": false,
-                    "deprecationMessage": "",
-                    "type": "string",
-                    "indexKey": "",
-                    "optional": false,
-                    "description": "",
-                    "line": 13
                 },
                 {
                     "name": "location",
@@ -256,36 +151,6 @@
                     "line": 7
                 },
                 {
-                    "name": "pressure",
-                    "deprecated": false,
-                    "deprecationMessage": "",
-                    "type": "number",
-                    "indexKey": "",
-                    "optional": false,
-                    "description": "",
-                    "line": 15
-                },
-                {
-                    "name": "sunrise",
-                    "deprecated": false,
-                    "deprecationMessage": "",
-                    "type": "number",
-                    "indexKey": "",
-                    "optional": false,
-                    "description": "",
-                    "line": 17
-                },
-                {
-                    "name": "sunset",
-                    "deprecated": false,
-                    "deprecationMessage": "",
-                    "type": "number",
-                    "indexKey": "",
-                    "optional": false,
-                    "description": "",
-                    "line": 18
-                },
-                {
                     "name": "temperature",
                     "deprecated": false,
                     "deprecationMessage": "",
@@ -296,7 +161,102 @@
                     "line": 8
                 },
                 {
-                    "name": "visibility",
+                    "name": "windSpeed",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "number",
+                    "indexKey": "",
+                    "optional": false,
+                    "description": "",
+                    "line": 11
+                }
+            ],
+            "indexSignatures": [],
+            "kind": 172,
+            "methods": [],
+            "extends": []
+        },
+        {
+            "name": "WeatherResponse",
+            "id": "interface-WeatherResponse-bcbe1430a6d0afe15ecb713649060156344daba3f2f565796dd78da0f6fc50cadf28ab9e3a0816c42978729d5de8669453cfcbbc3237da3cc534d0a52fdd582e",
+            "file": "src/stories/weather-widget/weather.service.ts",
+            "deprecated": false,
+            "deprecationMessage": "",
+            "type": "interface",
+            "sourceCode": "import { Injectable } from '@angular/core';\nimport { HttpClient } from '@angular/common/http';\nimport { Observable, throwError } from 'rxjs';\nimport { map, catchError } from 'rxjs/operators';\nimport { environment } from '../../environments/environment';\n\nexport interface WeatherResponse {\n  location: string;\n  temperature: number;\n  condition: string;\n  description: string;\n  humidity: number;\n  windSpeed: number;\n  icon: string;\n  feelsLike: number;\n  pressure: number;\n  visibility: number;\n  sunrise: number;\n  sunset: number;\n  forecast?: DailyForecast[];\n}\n\nexport interface DailyForecast {\n  date: string;\n  tempMax: number;\n  tempMin: number;\n  condition: string;\n  icon: string;\n  humidity: number;\n}\n\n@Injectable({\n  providedIn: 'root'\n})\nexport class WeatherService {\n  // Base URLs when using proxy vs direct calls\n  private readonly PROXY_BASE_URL = '/api/data/2.5';\n  private readonly DEFAULT_BASE_URL = 'https://api.openweathermap.org/data/2.5';\n\n  private readonly apiKey = environment.weatherApi?.key?.trim() ?? '';\n  private readonly useProxy = environment.useProxy === true;\n  private readonly corsProxy = environment.corsProxy?.trim() ?? '';\n  private readonly configuredBaseUrl = environment.weatherApi?.baseUrl?.trim() ?? this.DEFAULT_BASE_URL;\n\n  constructor(private http: HttpClient) {}\n\n  /**\n   * Get weather data by city name\n   */\n  getWeatherByCity(city: string, units: 'metric' | 'imperial' = 'imperial'): Observable<WeatherResponse> {\n    if (!this.isApiKeyConfigured()) {\n      return throwError(() => new Error('Weather API key is not configured. Please update environment.weatherApi.key.'));\n    }\n\n    const url = this.buildApiUrl('/weather', {\n      q: city,\n      units,\n      appid: this.apiKey\n    });\n\n    return this.http.get<any>(url).pipe(\n      map(data => this.transformWeatherData(data, units)),\n      catchError(this.handleError)\n    );\n  }\n\n  /**\n   * Get weather data by coordinates\n   */\n  getWeatherByCoordinates(lat: number, lon: number, units: 'metric' | 'imperial' = 'imperial'): Observable<WeatherResponse> {\n    if (!this.isApiKeyConfigured()) {\n      return throwError(() => new Error('Weather API key is not configured. Please update environment.weatherApi.key.'));\n    }\n\n    const url = this.buildApiUrl('/weather', {\n      lat,\n      lon,\n      units,\n      appid: this.apiKey\n    });\n\n    return this.http.get<any>(url).pipe(\n      map(data => this.transformWeatherData(data, units)),\n      catchError(this.handleError)\n    );\n  }\n\n  /**\n   * Get 5-day weather forecast\n   */\n  getForecast(city: string, units: 'metric' | 'imperial' = 'imperial'): Observable<DailyForecast[]> {\n    if (!this.isApiKeyConfigured()) {\n      return throwError(() => new Error('Weather API key is not configured. Please update environment.weatherApi.key.'));\n    }\n\n    const url = this.buildApiUrl('/forecast', {\n      q: city,\n      units,\n      appid: this.apiKey\n    });\n\n    return this.http.get<any>(url).pipe(\n      map(data => this.transformForecastData(data)),\n      catchError(this.handleError)\n    );\n  }\n\n  /**\n   * Get current position using browser geolocation\n   */\n  getCurrentPosition(): Promise<GeolocationCoordinates> {\n    return new Promise((resolve, reject) => {\n      if (!navigator.geolocation) {\n        reject(new Error('Geolocation is not supported by your browser'));\n      } else {\n        navigator.geolocation.getCurrentPosition(\n          position => resolve(position.coords),\n          error => reject(error)\n        );\n      }\n    });\n  }\n\n  /**\n   * Transform OpenWeatherMap API response to our WeatherResponse format\n   */\n  private transformWeatherData(data: any, units: string): WeatherResponse {\n    // Validate required data exists\n    if (!data || !data.main || !data.weather || !data.weather[0] || !data.wind || !data.sys) {\n      throw new Error('Invalid API response structure');\n    }\n\n    return {\n      location: `${data.name || 'Unknown'}${data.sys?.country ? ', ' + data.sys.country : ''}`,\n      temperature: Math.round(data.main.temp),\n      condition: data.weather[0].main,\n      description: data.weather[0].description,\n      humidity: data.main.humidity,\n      windSpeed: Math.round(data.wind.speed),\n      icon: this.getWeatherIcon(data.weather[0].id, data.weather[0].icon),\n      feelsLike: Math.round(data.main.feels_like),\n      pressure: data.main.pressure,\n      visibility: data.visibility || 0,\n      sunrise: data.sys.sunrise || 0,\n      sunset: data.sys.sunset || 0\n    };\n  }\n\n  /**\n   * Transform forecast data\n   */\n  private transformForecastData(data: any): DailyForecast[] {\n    if (!data || !Array.isArray(data.list)) {\n      throw new Error('Invalid forecast API response structure');\n    }\n\n    const dailyData: { [key: string]: any[] } = {};\n\n    // Group forecasts by day\n    data.list.forEach((item: any) => {\n      const date = new Date(item.dt * 1000).toISOString().split('T')[0];\n      if (!dailyData[date]) {\n        dailyData[date] = [];\n      }\n      dailyData[date].push(item);\n    });\n\n    // Get daily summary (first 5 days)\n    return Object.entries(dailyData).slice(0, 5).map(([date, items]) => {\n      const temps = items.map(item => item.main.temp);\n      const mainItem = items[Math.floor(items.length / 2)]; // Use midday data\n\n      return {\n        date,\n        tempMax: Math.round(Math.max(...temps)),\n        tempMin: Math.round(Math.min(...temps)),\n        condition: mainItem.weather[0].main,\n        icon: this.getWeatherIcon(mainItem.weather[0].id, mainItem.weather[0].icon),\n        humidity: mainItem.main.humidity\n      };\n    });\n  }\n\n  /**\n   * Map OpenWeatherMap weather codes to emoji icons\n   * Weather condition codes: https://openweathermap.org/weather-conditions\n   */\n  private getWeatherIcon(weatherId: number, iconCode: string): string {\n    // Check if it's night time (icon code ends with 'n')\n    const isNight = iconCode.endsWith('n');\n\n    if (weatherId >= 200 && weatherId < 300) {\n      return '⛈️'; // Thunderstorm\n    } else if (weatherId >= 300 && weatherId < 400) {\n      return '🌦️'; // Drizzle\n    } else if (weatherId >= 500 && weatherId < 600) {\n      return '🌧️'; // Rain\n    } else if (weatherId >= 600 && weatherId < 700) {\n      return '❄️'; // Snow\n    } else if (weatherId >= 700 && weatherId < 800) {\n      return '🌫️'; // Atmosphere (mist, fog, etc.)\n    } else if (weatherId === 800) {\n      return isNight ? '🌙' : '☀️'; // Clear\n    } else if (weatherId === 801) {\n      return isNight ? '☁️' : '⛅'; // Few clouds\n    } else if (weatherId > 801) {\n      return '☁️'; // Cloudy\n    }\n\n    return '⛅'; // Default\n  }\n\n  /**\n   * Handle HTTP errors\n   */\n  private handleError(error: any): Observable<never> {\n    let errorMessage = 'An error occurred while fetching weather data';\n\n    if (error.error instanceof ErrorEvent) {\n      // Client-side error\n      errorMessage = `Error: ${error.error.message}`;\n    } else if (error.status) {\n      // Server-side error\n      switch (error.status) {\n        case 401:\n          errorMessage = 'Invalid API key';\n          break;\n        case 404:\n          errorMessage = 'City not found';\n          break;\n        case 429:\n          errorMessage = 'API rate limit exceeded';\n          break;\n        default:\n          errorMessage = `Error: ${error.message}`;\n      }\n    }\n\n    console.error('Weather API Error:', error);\n    return throwError(() => new Error(errorMessage));\n  }\n\n  /**\n   * Build the API URL depending on proxy/cors configuration\n   */\n  private buildApiUrl(endpoint: string, params: Record<string, string | number>): string {\n    const base = this.useProxy ? this.PROXY_BASE_URL : this.configuredBaseUrl;\n    const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base;\n    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;\n\n    const urlParams = new URLSearchParams();\n    Object.entries(params).forEach(([key, value]) => {\n      urlParams.set(key, String(value));\n    });\n\n    const apiUrl = `${normalizedBase}${normalizedEndpoint}?${urlParams.toString()}`;\n\n    if (this.useProxy || !this.corsProxy) {\n      return apiUrl;\n    }\n\n    // When not using proxy, optionally prepend configured CORS proxy\n    if (this.corsProxy.includes('{url}')) {\n      return this.corsProxy.replace('{url}', encodeURIComponent(apiUrl));\n    }\n\n    const shouldEncode = this.corsProxy.endsWith('=') || this.corsProxy.includes('?url=');\n    return shouldEncode\n      ? `${this.corsProxy}${encodeURIComponent(apiUrl)}`\n      : `${this.corsProxy}${apiUrl}`;\n  }\n\n  private isApiKeyConfigured(): boolean {\n    return !!this.apiKey && this.apiKey !== 'YOUR_OPENWEATHERMAP_API_KEY';\n  }\n}\n",
+            "properties": [
+                {
+                    "name": "condition",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "string",
+                    "indexKey": "",
+                    "optional": false,
+                    "description": "",
+                    "line": 10
+                },
+                {
+                    "name": "description",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "string",
+                    "indexKey": "",
+                    "optional": false,
+                    "description": "",
+                    "line": 11
+                },
+                {
+                    "name": "feelsLike",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "number",
+                    "indexKey": "",
+                    "optional": false,
+                    "description": "",
+                    "line": 15
+                },
+                {
+                    "name": "forecast",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "DailyForecast[]",
+                    "indexKey": "",
+                    "optional": true,
+                    "description": "",
+                    "line": 20
+                },
+                {
+                    "name": "humidity",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "number",
+                    "indexKey": "",
+                    "optional": false,
+                    "description": "",
+                    "line": 12
+                },
+                {
+                    "name": "icon",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "string",
+                    "indexKey": "",
+                    "optional": false,
+                    "description": "",
+                    "line": 14
+                },
+                {
+                    "name": "location",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "string",
+                    "indexKey": "",
+                    "optional": false,
+                    "description": "",
+                    "line": 8
+                },
+                {
+                    "name": "pressure",
                     "deprecated": false,
                     "deprecationMessage": "",
                     "type": "number",
@@ -306,6 +266,46 @@
                     "line": 16
                 },
                 {
+                    "name": "sunrise",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "number",
+                    "indexKey": "",
+                    "optional": false,
+                    "description": "",
+                    "line": 18
+                },
+                {
+                    "name": "sunset",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "number",
+                    "indexKey": "",
+                    "optional": false,
+                    "description": "",
+                    "line": 19
+                },
+                {
+                    "name": "temperature",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "number",
+                    "indexKey": "",
+                    "optional": false,
+                    "description": "",
+                    "line": 9
+                },
+                {
+                    "name": "visibility",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "number",
+                    "indexKey": "",
+                    "optional": false,
+                    "description": "",
+                    "line": 17
+                },
+                {
                     "name": "windSpeed",
                     "deprecated": false,
                     "deprecationMessage": "",
@@ -313,7 +313,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 12
+                    "line": 13
                 }
             ],
             "indexSignatures": [],
@@ -325,27 +325,72 @@
     "injectables": [
         {
             "name": "WeatherService",
-            "id": "injectable-WeatherService-5e6e2244a6cfb29b4d94de83b9e3d023a3cad9cd8ce52febd669874cf18a00a62980016db8fdb6145960d74aca672d1bb9b4e973c1e1e4711a524722d5192c95",
+            "id": "injectable-WeatherService-bcbe1430a6d0afe15ecb713649060156344daba3f2f565796dd78da0f6fc50cadf28ab9e3a0816c42978729d5de8669453cfcbbc3237da3cc534d0a52fdd582e",
             "file": "src/stories/weather-widget/weather.service.ts",
             "properties": [
                 {
-                    "name": "API_KEY",
-                    "defaultValue": "'9a755e38ff059806bf283e3174fdeae7'",
+                    "name": "apiKey",
+                    "defaultValue": "environment.weatherApi?.key?.trim() ?? ''",
                     "deprecated": false,
                     "deprecationMessage": "",
-                    "type": "string",
+                    "type": "unknown",
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 36,
+                    "line": 40,
                     "modifierKind": [
                         123,
                         148
                     ]
                 },
                 {
-                    "name": "BASE_URL",
+                    "name": "configuredBaseUrl",
+                    "defaultValue": "environment.weatherApi?.baseUrl?.trim() ?? this.DEFAULT_BASE_URL",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "unknown",
+                    "indexKey": "",
+                    "optional": false,
+                    "description": "",
+                    "line": 43,
+                    "modifierKind": [
+                        123,
+                        148
+                    ]
+                },
+                {
+                    "name": "corsProxy",
+                    "defaultValue": "environment.corsProxy?.trim() ?? ''",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "unknown",
+                    "indexKey": "",
+                    "optional": false,
+                    "description": "",
+                    "line": 42,
+                    "modifierKind": [
+                        123,
+                        148
+                    ]
+                },
+                {
+                    "name": "DEFAULT_BASE_URL",
                     "defaultValue": "'https://api.openweathermap.org/data/2.5'",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "string",
+                    "indexKey": "",
+                    "optional": false,
+                    "description": "",
+                    "line": 38,
+                    "modifierKind": [
+                        123,
+                        148
+                    ]
+                },
+                {
+                    "name": "PROXY_BASE_URL",
+                    "defaultValue": "'/api/data/2.5'",
                     "deprecated": false,
                     "deprecationMessage": "",
                     "type": "string",
@@ -359,11 +404,11 @@
                     ]
                 },
                 {
-                    "name": "CORS_PROXY",
-                    "defaultValue": "'https://api.allorigins.win/raw?url='",
+                    "name": "useProxy",
+                    "defaultValue": "environment.useProxy === true",
                     "deprecated": false,
                     "deprecationMessage": "",
-                    "type": "string",
+                    "type": "unknown",
                     "indexKey": "",
                     "optional": false,
                     "description": "",
@@ -376,12 +421,60 @@
             ],
             "methods": [
                 {
+                    "name": "buildApiUrl",
+                    "args": [
+                        {
+                            "name": "endpoint",
+                            "type": "string",
+                            "deprecated": false,
+                            "deprecationMessage": ""
+                        },
+                        {
+                            "name": "params",
+                            "type": "Record<string | string | number>",
+                            "deprecated": false,
+                            "deprecationMessage": ""
+                        }
+                    ],
+                    "optional": false,
+                    "returnType": "string",
+                    "typeParameters": [],
+                    "line": 246,
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "rawdescription": "\n\nBuild the API URL depending on proxy/cors configuration\n",
+                    "description": "<p>Build the API URL depending on proxy/cors configuration</p>\n",
+                    "modifierKind": [
+                        123
+                    ],
+                    "jsdoctags": [
+                        {
+                            "name": "endpoint",
+                            "type": "string",
+                            "deprecated": false,
+                            "deprecationMessage": "",
+                            "tagName": {
+                                "text": "param"
+                            }
+                        },
+                        {
+                            "name": "params",
+                            "type": "Record<string | string | number>",
+                            "deprecated": false,
+                            "deprecationMessage": "",
+                            "tagName": {
+                                "text": "param"
+                            }
+                        }
+                    ]
+                },
+                {
                     "name": "getCurrentPosition",
                     "args": [],
                     "optional": false,
                     "returnType": "Promise<GeolocationCoordinates>",
                     "typeParameters": [],
-                    "line": 90,
+                    "line": 111,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "rawdescription": "\n\nGet current position using browser geolocation\n",
@@ -407,7 +500,7 @@
                     "optional": false,
                     "returnType": "Observable<DailyForecast[]>",
                     "typeParameters": [],
-                    "line": 77,
+                    "line": 91,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "rawdescription": "\n\nGet 5-day weather forecast\n",
@@ -454,7 +547,7 @@
                     "optional": false,
                     "returnType": "Observable<WeatherResponse>",
                     "typeParameters": [],
-                    "line": 51,
+                    "line": 50,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "rawdescription": "\n\nGet weather data by city name\n",
@@ -507,7 +600,7 @@
                     "optional": false,
                     "returnType": "Observable<WeatherResponse>",
                     "typeParameters": [],
-                    "line": 64,
+                    "line": 70,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "rawdescription": "\n\nGet weather data by coordinates\n",
@@ -562,7 +655,7 @@
                     "optional": false,
                     "returnType": "string",
                     "typeParameters": [],
-                    "line": 163,
+                    "line": 188,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "rawdescription": "\n\nMap OpenWeatherMap weather codes to emoji icons\nWeather condition codes: https://openweathermap.org/weather-conditions\n",
@@ -604,7 +697,7 @@
                     "optional": false,
                     "returnType": "Observable<never>",
                     "typeParameters": [],
-                    "line": 191,
+                    "line": 216,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "rawdescription": "\n\nHandle HTTP errors\n",
@@ -625,6 +718,19 @@
                     ]
                 },
                 {
+                    "name": "isApiKeyConfigured",
+                    "args": [],
+                    "optional": false,
+                    "returnType": "boolean",
+                    "typeParameters": [],
+                    "line": 273,
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "modifierKind": [
+                        123
+                    ]
+                },
+                {
                     "name": "transformForecastData",
                     "args": [
                         {
@@ -637,7 +743,7 @@
                     "optional": false,
                     "returnType": "DailyForecast[]",
                     "typeParameters": [],
-                    "line": 131,
+                    "line": 152,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "rawdescription": "\n\nTransform forecast data\n",
@@ -676,7 +782,7 @@
                     "optional": false,
                     "returnType": "WeatherResponse",
                     "typeParameters": [],
-                    "line": 106,
+                    "line": 127,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "rawdescription": "\n\nTransform OpenWeatherMap API response to our WeatherResponse format\n",
@@ -710,7 +816,7 @@
             "deprecationMessage": "",
             "description": "",
             "rawdescription": "\n",
-            "sourceCode": "import { Injectable } from '@angular/core';\nimport { HttpClient } from '@angular/common/http';\nimport { Observable, throwError } from 'rxjs';\nimport { map, catchError } from 'rxjs/operators';\n\nexport interface WeatherResponse {\n  location: string;\n  temperature: number;\n  condition: string;\n  description: string;\n  humidity: number;\n  windSpeed: number;\n  icon: string;\n  feelsLike: number;\n  pressure: number;\n  visibility: number;\n  sunrise: number;\n  sunset: number;\n  forecast?: DailyForecast[];\n}\n\nexport interface DailyForecast {\n  date: string;\n  tempMax: number;\n  tempMin: number;\n  condition: string;\n  icon: string;\n  humidity: number;\n}\n\n@Injectable({\n  providedIn: 'root'\n})\nexport class WeatherService {\n  // OpenWeatherMap API configuration\n  private readonly API_KEY = '9a755e38ff059806bf283e3174fdeae7';\n  private readonly BASE_URL = 'https://api.openweathermap.org/data/2.5';\n\n  // CORS proxy - you can use cors-anywhere or similar\n  // Option 1: Use a public CORS proxy (not recommended for production)\n  private readonly CORS_PROXY = 'https://api.allorigins.win/raw?url=';\n\n  // Option 2: For development, you can also use: 'https://corsproxy.io/?'\n  // private readonly CORS_PROXY = 'https://corsproxy.io/?';\n\n  constructor(private http: HttpClient) {}\n\n  /**\n   * Get weather data by city name\n   */\n  getWeatherByCity(city: string, units: 'metric' | 'imperial' = 'imperial'): Observable<WeatherResponse> {\n    const url = `${this.BASE_URL}/weather?q=${encodeURIComponent(city)}&appid=${this.API_KEY}&units=${units}`;\n    const proxiedUrl = `${this.CORS_PROXY}${encodeURIComponent(url)}`;\n\n    return this.http.get<any>(proxiedUrl).pipe(\n      map(data => this.transformWeatherData(data, units)),\n      catchError(this.handleError)\n    );\n  }\n\n  /**\n   * Get weather data by coordinates\n   */\n  getWeatherByCoordinates(lat: number, lon: number, units: 'metric' | 'imperial' = 'imperial'): Observable<WeatherResponse> {\n    const url = `${this.BASE_URL}/weather?lat=${lat}&lon=${lon}&appid=${this.API_KEY}&units=${units}`;\n    const proxiedUrl = `${this.CORS_PROXY}${encodeURIComponent(url)}`;\n\n    return this.http.get<any>(proxiedUrl).pipe(\n      map(data => this.transformWeatherData(data, units)),\n      catchError(this.handleError)\n    );\n  }\n\n  /**\n   * Get 5-day weather forecast\n   */\n  getForecast(city: string, units: 'metric' | 'imperial' = 'imperial'): Observable<DailyForecast[]> {\n    const url = `${this.BASE_URL}/forecast?q=${encodeURIComponent(city)}&appid=${this.API_KEY}&units=${units}`;\n    const proxiedUrl = `${this.CORS_PROXY}${encodeURIComponent(url)}`;\n\n    return this.http.get<any>(proxiedUrl).pipe(\n      map(data => this.transformForecastData(data)),\n      catchError(this.handleError)\n    );\n  }\n\n  /**\n   * Get current position using browser geolocation\n   */\n  getCurrentPosition(): Promise<GeolocationCoordinates> {\n    return new Promise((resolve, reject) => {\n      if (!navigator.geolocation) {\n        reject(new Error('Geolocation is not supported by your browser'));\n      } else {\n        navigator.geolocation.getCurrentPosition(\n          position => resolve(position.coords),\n          error => reject(error)\n        );\n      }\n    });\n  }\n\n  /**\n   * Transform OpenWeatherMap API response to our WeatherResponse format\n   */\n  private transformWeatherData(data: any, units: string): WeatherResponse {\n    // Validate required data exists\n    if (!data || !data.main || !data.weather || !data.weather[0] || !data.wind || !data.sys) {\n      throw new Error('Invalid API response structure');\n    }\n\n    return {\n      location: `${data.name || 'Unknown'}${data.sys?.country ? ', ' + data.sys.country : ''}`,\n      temperature: Math.round(data.main.temp),\n      condition: data.weather[0].main,\n      description: data.weather[0].description,\n      humidity: data.main.humidity,\n      windSpeed: Math.round(data.wind.speed),\n      icon: this.getWeatherIcon(data.weather[0].id, data.weather[0].icon),\n      feelsLike: Math.round(data.main.feels_like),\n      pressure: data.main.pressure,\n      visibility: data.visibility || 0,\n      sunrise: data.sys.sunrise || 0,\n      sunset: data.sys.sunset || 0\n    };\n  }\n\n  /**\n   * Transform forecast data\n   */\n  private transformForecastData(data: any): DailyForecast[] {\n    const dailyData: { [key: string]: any[] } = {};\n\n    // Group forecasts by day\n    data.list.forEach((item: any) => {\n      const date = new Date(item.dt * 1000).toLocaleDateString();\n      if (!dailyData[date]) {\n        dailyData[date] = [];\n      }\n      dailyData[date].push(item);\n    });\n\n    // Get daily summary (first 5 days)\n    return Object.entries(dailyData).slice(0, 5).map(([date, items]) => {\n      const temps = items.map(item => item.main.temp);\n      const mainItem = items[Math.floor(items.length / 2)]; // Use midday data\n\n      return {\n        date,\n        tempMax: Math.round(Math.max(...temps)),\n        tempMin: Math.round(Math.min(...temps)),\n        condition: mainItem.weather[0].main,\n        icon: this.getWeatherIcon(mainItem.weather[0].id, mainItem.weather[0].icon),\n        humidity: mainItem.main.humidity\n      };\n    });\n  }\n\n  /**\n   * Map OpenWeatherMap weather codes to emoji icons\n   * Weather condition codes: https://openweathermap.org/weather-conditions\n   */\n  private getWeatherIcon(weatherId: number, iconCode: string): string {\n    // Check if it's night time (icon code ends with 'n')\n    const isNight = iconCode.endsWith('n');\n\n    if (weatherId >= 200 && weatherId < 300) {\n      return '⛈️'; // Thunderstorm\n    } else if (weatherId >= 300 && weatherId < 400) {\n      return '🌦️'; // Drizzle\n    } else if (weatherId >= 500 && weatherId < 600) {\n      return '🌧️'; // Rain\n    } else if (weatherId >= 600 && weatherId < 700) {\n      return '❄️'; // Snow\n    } else if (weatherId >= 700 && weatherId < 800) {\n      return '🌫️'; // Atmosphere (mist, fog, etc.)\n    } else if (weatherId === 800) {\n      return isNight ? '🌙' : '☀️'; // Clear\n    } else if (weatherId === 801) {\n      return isNight ? '☁️' : '⛅'; // Few clouds\n    } else if (weatherId > 801) {\n      return '☁️'; // Cloudy\n    }\n\n    return '⛅'; // Default\n  }\n\n  /**\n   * Handle HTTP errors\n   */\n  private handleError(error: any): Observable<never> {\n    let errorMessage = 'An error occurred while fetching weather data';\n\n    if (error.error instanceof ErrorEvent) {\n      // Client-side error\n      errorMessage = `Error: ${error.error.message}`;\n    } else if (error.status) {\n      // Server-side error\n      switch (error.status) {\n        case 401:\n          errorMessage = 'Invalid API key';\n          break;\n        case 404:\n          errorMessage = 'City not found';\n          break;\n        case 429:\n          errorMessage = 'API rate limit exceeded';\n          break;\n        default:\n          errorMessage = `Error: ${error.message}`;\n      }\n    }\n\n    console.error('Weather API Error:', error);\n    return throwError(() => new Error(errorMessage));\n  }\n}\n",
+            "sourceCode": "import { Injectable } from '@angular/core';\nimport { HttpClient } from '@angular/common/http';\nimport { Observable, throwError } from 'rxjs';\nimport { map, catchError } from 'rxjs/operators';\nimport { environment } from '../../environments/environment';\n\nexport interface WeatherResponse {\n  location: string;\n  temperature: number;\n  condition: string;\n  description: string;\n  humidity: number;\n  windSpeed: number;\n  icon: string;\n  feelsLike: number;\n  pressure: number;\n  visibility: number;\n  sunrise: number;\n  sunset: number;\n  forecast?: DailyForecast[];\n}\n\nexport interface DailyForecast {\n  date: string;\n  tempMax: number;\n  tempMin: number;\n  condition: string;\n  icon: string;\n  humidity: number;\n}\n\n@Injectable({\n  providedIn: 'root'\n})\nexport class WeatherService {\n  // Base URLs when using proxy vs direct calls\n  private readonly PROXY_BASE_URL = '/api/data/2.5';\n  private readonly DEFAULT_BASE_URL = 'https://api.openweathermap.org/data/2.5';\n\n  private readonly apiKey = environment.weatherApi?.key?.trim() ?? '';\n  private readonly useProxy = environment.useProxy === true;\n  private readonly corsProxy = environment.corsProxy?.trim() ?? '';\n  private readonly configuredBaseUrl = environment.weatherApi?.baseUrl?.trim() ?? this.DEFAULT_BASE_URL;\n\n  constructor(private http: HttpClient) {}\n\n  /**\n   * Get weather data by city name\n   */\n  getWeatherByCity(city: string, units: 'metric' | 'imperial' = 'imperial'): Observable<WeatherResponse> {\n    if (!this.isApiKeyConfigured()) {\n      return throwError(() => new Error('Weather API key is not configured. Please update environment.weatherApi.key.'));\n    }\n\n    const url = this.buildApiUrl('/weather', {\n      q: city,\n      units,\n      appid: this.apiKey\n    });\n\n    return this.http.get<any>(url).pipe(\n      map(data => this.transformWeatherData(data, units)),\n      catchError(this.handleError)\n    );\n  }\n\n  /**\n   * Get weather data by coordinates\n   */\n  getWeatherByCoordinates(lat: number, lon: number, units: 'metric' | 'imperial' = 'imperial'): Observable<WeatherResponse> {\n    if (!this.isApiKeyConfigured()) {\n      return throwError(() => new Error('Weather API key is not configured. Please update environment.weatherApi.key.'));\n    }\n\n    const url = this.buildApiUrl('/weather', {\n      lat,\n      lon,\n      units,\n      appid: this.apiKey\n    });\n\n    return this.http.get<any>(url).pipe(\n      map(data => this.transformWeatherData(data, units)),\n      catchError(this.handleError)\n    );\n  }\n\n  /**\n   * Get 5-day weather forecast\n   */\n  getForecast(city: string, units: 'metric' | 'imperial' = 'imperial'): Observable<DailyForecast[]> {\n    if (!this.isApiKeyConfigured()) {\n      return throwError(() => new Error('Weather API key is not configured. Please update environment.weatherApi.key.'));\n    }\n\n    const url = this.buildApiUrl('/forecast', {\n      q: city,\n      units,\n      appid: this.apiKey\n    });\n\n    return this.http.get<any>(url).pipe(\n      map(data => this.transformForecastData(data)),\n      catchError(this.handleError)\n    );\n  }\n\n  /**\n   * Get current position using browser geolocation\n   */\n  getCurrentPosition(): Promise<GeolocationCoordinates> {\n    return new Promise((resolve, reject) => {\n      if (!navigator.geolocation) {\n        reject(new Error('Geolocation is not supported by your browser'));\n      } else {\n        navigator.geolocation.getCurrentPosition(\n          position => resolve(position.coords),\n          error => reject(error)\n        );\n      }\n    });\n  }\n\n  /**\n   * Transform OpenWeatherMap API response to our WeatherResponse format\n   */\n  private transformWeatherData(data: any, units: string): WeatherResponse {\n    // Validate required data exists\n    if (!data || !data.main || !data.weather || !data.weather[0] || !data.wind || !data.sys) {\n      throw new Error('Invalid API response structure');\n    }\n\n    return {\n      location: `${data.name || 'Unknown'}${data.sys?.country ? ', ' + data.sys.country : ''}`,\n      temperature: Math.round(data.main.temp),\n      condition: data.weather[0].main,\n      description: data.weather[0].description,\n      humidity: data.main.humidity,\n      windSpeed: Math.round(data.wind.speed),\n      icon: this.getWeatherIcon(data.weather[0].id, data.weather[0].icon),\n      feelsLike: Math.round(data.main.feels_like),\n      pressure: data.main.pressure,\n      visibility: data.visibility || 0,\n      sunrise: data.sys.sunrise || 0,\n      sunset: data.sys.sunset || 0\n    };\n  }\n\n  /**\n   * Transform forecast data\n   */\n  private transformForecastData(data: any): DailyForecast[] {\n    if (!data || !Array.isArray(data.list)) {\n      throw new Error('Invalid forecast API response structure');\n    }\n\n    const dailyData: { [key: string]: any[] } = {};\n\n    // Group forecasts by day\n    data.list.forEach((item: any) => {\n      const date = new Date(item.dt * 1000).toISOString().split('T')[0];\n      if (!dailyData[date]) {\n        dailyData[date] = [];\n      }\n      dailyData[date].push(item);\n    });\n\n    // Get daily summary (first 5 days)\n    return Object.entries(dailyData).slice(0, 5).map(([date, items]) => {\n      const temps = items.map(item => item.main.temp);\n      const mainItem = items[Math.floor(items.length / 2)]; // Use midday data\n\n      return {\n        date,\n        tempMax: Math.round(Math.max(...temps)),\n        tempMin: Math.round(Math.min(...temps)),\n        condition: mainItem.weather[0].main,\n        icon: this.getWeatherIcon(mainItem.weather[0].id, mainItem.weather[0].icon),\n        humidity: mainItem.main.humidity\n      };\n    });\n  }\n\n  /**\n   * Map OpenWeatherMap weather codes to emoji icons\n   * Weather condition codes: https://openweathermap.org/weather-conditions\n   */\n  private getWeatherIcon(weatherId: number, iconCode: string): string {\n    // Check if it's night time (icon code ends with 'n')\n    const isNight = iconCode.endsWith('n');\n\n    if (weatherId >= 200 && weatherId < 300) {\n      return '⛈️'; // Thunderstorm\n    } else if (weatherId >= 300 && weatherId < 400) {\n      return '🌦️'; // Drizzle\n    } else if (weatherId >= 500 && weatherId < 600) {\n      return '🌧️'; // Rain\n    } else if (weatherId >= 600 && weatherId < 700) {\n      return '❄️'; // Snow\n    } else if (weatherId >= 700 && weatherId < 800) {\n      return '🌫️'; // Atmosphere (mist, fog, etc.)\n    } else if (weatherId === 800) {\n      return isNight ? '🌙' : '☀️'; // Clear\n    } else if (weatherId === 801) {\n      return isNight ? '☁️' : '⛅'; // Few clouds\n    } else if (weatherId > 801) {\n      return '☁️'; // Cloudy\n    }\n\n    return '⛅'; // Default\n  }\n\n  /**\n   * Handle HTTP errors\n   */\n  private handleError(error: any): Observable<never> {\n    let errorMessage = 'An error occurred while fetching weather data';\n\n    if (error.error instanceof ErrorEvent) {\n      // Client-side error\n      errorMessage = `Error: ${error.error.message}`;\n    } else if (error.status) {\n      // Server-side error\n      switch (error.status) {\n        case 401:\n          errorMessage = 'Invalid API key';\n          break;\n        case 404:\n          errorMessage = 'City not found';\n          break;\n        case 429:\n          errorMessage = 'API rate limit exceeded';\n          break;\n        default:\n          errorMessage = `Error: ${error.message}`;\n      }\n    }\n\n    console.error('Weather API Error:', error);\n    return throwError(() => new Error(errorMessage));\n  }\n\n  /**\n   * Build the API URL depending on proxy/cors configuration\n   */\n  private buildApiUrl(endpoint: string, params: Record<string, string | number>): string {\n    const base = this.useProxy ? this.PROXY_BASE_URL : this.configuredBaseUrl;\n    const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base;\n    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;\n\n    const urlParams = new URLSearchParams();\n    Object.entries(params).forEach(([key, value]) => {\n      urlParams.set(key, String(value));\n    });\n\n    const apiUrl = `${normalizedBase}${normalizedEndpoint}?${urlParams.toString()}`;\n\n    if (this.useProxy || !this.corsProxy) {\n      return apiUrl;\n    }\n\n    // When not using proxy, optionally prepend configured CORS proxy\n    if (this.corsProxy.includes('{url}')) {\n      return this.corsProxy.replace('{url}', encodeURIComponent(apiUrl));\n    }\n\n    const shouldEncode = this.corsProxy.endsWith('=') || this.corsProxy.includes('?url=');\n    return shouldEncode\n      ? `${this.corsProxy}${encodeURIComponent(apiUrl)}`\n      : `${this.corsProxy}${apiUrl}`;\n  }\n\n  private isApiKeyConfigured(): boolean {\n    return !!this.apiKey && this.apiKey !== 'YOUR_OPENWEATHERMAP_API_KEY';\n  }\n}\n",
             "constructorObj": {
                 "name": "constructor",
                 "description": "",
@@ -724,7 +830,7 @@
                         "deprecationMessage": ""
                     }
                 ],
-                "line": 41,
+                "line": 43,
                 "jsdoctags": [
                     {
                         "name": "http",
@@ -748,7 +854,7 @@
     "components": [
         {
             "name": "App",
-            "id": "component-App-7e75558a2f90c6fa23459e652fc99ec9e83539afd276818abb7a5d0410bded9b74db493f552c481021c143d11d0f6daa04fbf3a2ebbb359ff7a72b5aa878bdd1",
+            "id": "component-App-4319a2f3c7989e9b9eb14aea55fc657ff2735c831c4fe6e0f6a5e65b4572e7b7dac36bf90997138ed726d43e9ff15362a4e5bb3f597d5628f2f8cda2248725af",
             "file": "src/app/app.ts",
             "encapsulation": [],
             "entryComponents": [],
@@ -783,7 +889,7 @@
                 },
                 {
                     "name": "weatherData",
-                    "defaultValue": "{\n    location:'The Hague',\n    temperature: 72,\n    condition: 'Partly Cloudy',\n    humidity: 65,\n    windSpeed: 12,\n    icon: '⛅',\n  }",
+                    "defaultValue": "{\n    location: 'The Hague',\n    temperature: 13,\n    condition: 'Partly Cloudy',\n    humidity: 65,\n    windSpeed: 12,\n    icon: '⛅',\n  }",
                     "deprecated": false,
                     "deprecationMessage": "",
                     "type": "WeatherData",
@@ -811,13 +917,13 @@
             "description": "",
             "rawdescription": "\n",
             "type": "component",
-            "sourceCode": "import { Component, signal } from '@angular/core';\nimport { RouterOutlet } from '@angular/router';\nimport { provideHttpClient } from '@angular/common/http';\nimport { WeatherWidgetComponent, WeatherData } from '../stories/weather-widget/weather-widget.component';\n\n@Component({\n  selector: 'app-root',\n  imports: [RouterOutlet, WeatherWidgetComponent],\n  templateUrl: './app.html',\n  styleUrl: './app.css'\n})\nexport class App {\n  protected readonly title = signal('weather');\n\n  weatherData: WeatherData = {\n    location: 'The Hague',\n    temperature: 72,\n    condition: 'Partly Cloudy',\n    humidity: 65,\n    windSpeed: 12,\n    icon: '⛅',\n  };\n}\n",
+            "sourceCode": "import { Component, signal } from '@angular/core';\nimport { RouterOutlet } from '@angular/router';\nimport { provideHttpClient } from '@angular/common/http';\nimport { WeatherWidgetComponent, WeatherData } from '../stories/weather-widget/weather-widget.component';\n\n@Component({\n  selector: 'app-root',\n  imports: [RouterOutlet, WeatherWidgetComponent],\n  templateUrl: './app.html',\n  styleUrl: './app.css'\n})\nexport class App {\n  protected readonly title = signal('weather');\n\n  weatherData: WeatherData = {\n    location: 'The Hague',\n    temperature: 13,\n    condition: 'Partly Cloudy',\n    humidity: 65,\n    windSpeed: 12,\n    icon: '⛅',\n  };\n}\n",
             "styleUrl": "./app.css",
             "assetsDirs": [],
             "styleUrlsData": "",
             "stylesData": "",
             "extends": [],
-            "templateData": "<!-- Weather Widget Demo -->\n<div class=\"weather-app-container\">\n  <h1>Weather App</h1>\n  <p class=\"subtitle\">Real-time weather forecast for your location</p>\n  <weather-widget\n    [enableSearch]=\"true\"\n    [useRealData]=\"true\"\n    [initialCity]=\"'Den Haag'\"\n    [weatherData]=\"weatherData\"\n    [unit]=\"'C'\"\n    [theme]=\"'dark'\"\n    [size]=\"'small'\">\n  </weather-widget>\n  <p class=\"info-text\">\n    💡 Tip: Set <code>useRealData=\"true\"</code> and configure your OpenWeatherMap API key to fetch live data!\n  </p>\n</div>\n\n<style>\n  :host {\n    --bright-blue: oklch(51.01% 0.274 263.83);\n    --electric-violet: oklch(53.18% 0.28 296.97);\n    --french-violet: oklch(47.66% 0.246 305.88);\n    --vivid-pink: oklch(69.02% 0.277 332.77);\n    --hot-red: oklch(61.42% 0.238 15.34);\n    --orange-red: oklch(63.32% 0.24 31.68);\n\n    --gray-900: oklch(19.37% 0.006 300.98);\n    --gray-700: oklch(36.98% 0.014 302.71);\n    --gray-400: oklch(70.9% 0.015 304.04);\n\n    --red-to-pink-to-purple-vertical-gradient: linear-gradient(\n      180deg,\n      var(--orange-red) 0%,\n      var(--vivid-pink) 50%,\n      var(--electric-violet) 100%\n    );\n\n    --red-to-pink-to-purple-horizontal-gradient: linear-gradient(\n      90deg,\n      var(--orange-red) 0%,\n      var(--vivid-pink) 50%,\n      var(--electric-violet) 100%\n    );\n\n    --pill-accent: var(--bright-blue);\n\n    font-family: \"Inter\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto,\n      Helvetica, Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\",\n      \"Segoe UI Symbol\";\n    box-sizing: border-box;\n    -webkit-font-smoothing: antialiased;\n    -moz-osx-font-smoothing: grayscale;\n  }\n\n  h1 {\n    font-size: 3.125rem;\n    color: var(--gray-900);\n    font-weight: 500;\n    line-height: 100%;\n    letter-spacing: -0.125rem;\n    margin: 0;\n    font-family: \"Inter Tight\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto,\n      Helvetica, Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\",\n      \"Segoe UI Symbol\";\n  }\n\n  p {\n    margin: 0;\n    color: var(--gray-700);\n  }\n\n  main {\n    width: 100%;\n    min-height: 100%;\n    display: flex;\n    justify-content: center;\n    align-items: center;\n    padding: 1rem;\n    box-sizing: inherit;\n    position: relative;\n  }\n\n  .angular-logo {\n    max-width: 9.2rem;\n  }\n\n  .content {\n    display: flex;\n    justify-content: space-around;\n    width: 100%;\n    max-width: 700px;\n    margin-bottom: 3rem;\n  }\n\n  .content h1 {\n    margin-top: 1.75rem;\n  }\n\n  .content p {\n    margin-top: 1.5rem;\n  }\n\n  .divider {\n    width: 1px;\n    background: var(--red-to-pink-to-purple-vertical-gradient);\n    margin-inline: 0.5rem;\n  }\n\n  .pill-group {\n    display: flex;\n    flex-direction: column;\n    align-items: start;\n    flex-wrap: wrap;\n    gap: 1.25rem;\n  }\n\n  .pill {\n    display: flex;\n    align-items: center;\n    --pill-accent: var(--bright-blue);\n    background: color-mix(in srgb, var(--pill-accent) 5%, transparent);\n    color: var(--pill-accent);\n    padding-inline: 0.75rem;\n    padding-block: 0.375rem;\n    border-radius: 2.75rem;\n    border: 0;\n    transition: background 0.3s ease;\n    font-family: var(--inter-font);\n    font-size: 0.875rem;\n    font-style: normal;\n    font-weight: 500;\n    line-height: 1.4rem;\n    letter-spacing: -0.00875rem;\n    text-decoration: none;\n    white-space: nowrap;\n  }\n\n  .pill:hover {\n    background: color-mix(in srgb, var(--pill-accent) 15%, transparent);\n  }\n\n  .pill-group .pill:nth-child(6n + 1) {\n    --pill-accent: var(--bright-blue);\n  }\n  .pill-group .pill:nth-child(6n + 2) {\n    --pill-accent: var(--electric-violet);\n  }\n  .pill-group .pill:nth-child(6n + 3) {\n    --pill-accent: var(--french-violet);\n  }\n\n  .pill-group .pill:nth-child(6n + 4),\n  .pill-group .pill:nth-child(6n + 5),\n  .pill-group .pill:nth-child(6n + 6) {\n    --pill-accent: var(--hot-red);\n  }\n\n  .pill-group svg {\n    margin-inline-start: 0.25rem;\n  }\n\n  .social-links {\n    display: flex;\n    align-items: center;\n    gap: 0.73rem;\n    margin-top: 1.5rem;\n  }\n\n  .social-links path {\n    transition: fill 0.3s ease;\n    fill: var(--gray-400);\n  }\n\n  .social-links a:hover svg path {\n    fill: var(--gray-900);\n  }\n\n  @media screen and (max-width: 650px) {\n    .content {\n      flex-direction: column;\n      width: max-content;\n    }\n\n    .divider {\n      height: 1px;\n      width: 100%;\n      background: var(--red-to-pink-to-purple-horizontal-gradient);\n      margin-block: 1.5rem;\n    }\n  }\n</style>\n\n<main class=\"main\">\n  <div class=\"content\">\n    <div class=\"left-side\">\n      <svg\n        xmlns=\"http://www.w3.org/2000/svg\"\n        viewBox=\"0 0 982 239\"\n        fill=\"none\"\n        class=\"angular-logo\"\n      >\n        <g clip-path=\"url(#a)\">\n          <path\n            fill=\"url(#b)\"\n            d=\"M388.676 191.625h30.849L363.31 31.828h-35.758l-56.215 159.797h30.848l13.174-39.356h60.061l13.256 39.356Zm-65.461-62.675 21.602-64.311h1.227l21.602 64.311h-44.431Zm126.831-7.527v70.202h-28.23V71.839h27.002v20.374h1.392c2.782-6.71 7.2-12.028 13.255-15.956 6.056-3.927 13.584-5.89 22.503-5.89 8.264 0 15.465 1.8 21.684 5.318 6.137 3.518 10.964 8.673 14.319 15.382 3.437 6.71 5.074 14.81 4.992 24.383v76.175h-28.23v-71.92c0-8.019-2.046-14.237-6.219-18.819-4.173-4.5-9.819-6.791-17.102-6.791-4.91 0-9.328 1.063-13.174 3.272-3.846 2.128-6.792 5.237-9.001 9.328-2.046 4.009-3.191 8.918-3.191 14.728ZM589.233 239c-10.147 0-18.82-1.391-26.103-4.091-7.282-2.7-13.092-6.382-17.511-10.964-4.418-4.582-7.528-9.655-9.164-15.219l25.448-6.136c1.145 2.372 2.782 4.663 4.991 6.954 2.209 2.291 5.155 4.255 8.837 5.81 3.683 1.554 8.428 2.291 14.074 2.291 8.019 0 14.647-1.964 19.884-5.81 5.237-3.845 7.856-10.227 7.856-19.064v-22.665h-1.391c-1.473 2.946-3.601 5.892-6.383 9.001-2.782 3.109-6.464 5.645-10.965 7.691-4.582 2.046-10.228 3.109-17.101 3.109-9.165 0-17.511-2.209-25.039-6.545-7.446-4.337-13.42-10.883-17.757-19.474-4.418-8.673-6.628-19.473-6.628-32.565 0-13.091 2.21-24.301 6.628-33.383 4.419-9.082 10.311-15.955 17.839-20.7 7.528-4.746 15.874-7.037 25.039-7.037 7.037 0 12.846 1.145 17.347 3.518 4.582 2.373 8.182 5.236 10.883 8.51 2.7 3.272 4.746 6.382 6.137 9.327h1.554v-19.8h27.821v121.749c0 10.228-2.454 18.737-7.364 25.447-4.91 6.709-11.538 11.7-20.048 15.055-8.509 3.355-18.165 4.991-28.884 4.991Zm.245-71.266c5.974 0 11.047-1.473 15.302-4.337 4.173-2.945 7.446-7.118 9.573-12.519 2.21-5.482 3.274-12.027 3.274-19.637 0-7.609-1.064-14.155-3.274-19.8-2.127-5.646-5.318-10.064-9.491-13.255-4.174-3.11-9.329-4.746-15.384-4.746s-11.537 1.636-15.792 4.91c-4.173 3.272-7.365 7.772-9.492 13.418-2.128 5.727-3.191 12.191-3.191 19.392 0 7.2 1.063 13.745 3.273 19.228 2.127 5.482 5.318 9.736 9.573 12.764 4.174 3.027 9.41 4.582 15.629 4.582Zm141.56-26.51V71.839h28.23v119.786h-27.412v-21.273h-1.227c-2.7 6.709-7.119 12.191-13.338 16.446-6.137 4.255-13.747 6.382-22.748 6.382-7.855 0-14.81-1.718-20.783-5.237-5.974-3.518-10.72-8.591-14.075-15.382-3.355-6.709-5.073-14.891-5.073-24.464V71.839h28.312v71.921c0 7.609 2.046 13.664 6.219 18.083 4.173 4.5 9.655 6.709 16.365 6.709 4.173 0 8.183-.982 12.111-3.028 3.927-2.045 7.118-5.072 9.655-9.082 2.537-4.091 3.764-9.164 3.764-15.218Zm65.707-109.395v159.796h-28.23V31.828h28.23Zm44.841 162.169c-7.61 0-14.402-1.391-20.457-4.091-6.055-2.7-10.883-6.791-14.32-12.109-3.518-5.319-5.237-11.946-5.237-19.801 0-6.791 1.228-12.355 3.765-16.773 2.536-4.419 5.891-7.937 10.228-10.637 4.337-2.618 9.164-4.664 14.647-6.055 5.4-1.391 11.046-2.373 16.856-3.027 7.037-.737 12.683-1.391 17.102-1.964 4.337-.573 7.528-1.555 9.574-2.782 1.963-1.309 3.027-3.273 3.027-5.973v-.491c0-5.891-1.718-10.391-5.237-13.664-3.518-3.191-8.51-4.828-15.056-4.828-6.955 0-12.356 1.473-16.447 4.5-4.009 3.028-6.71 6.546-8.183 10.719l-26.348-3.764c2.046-7.282 5.483-13.336 10.31-18.328 4.746-4.909 10.638-8.59 17.511-11.045 6.955-2.455 14.565-3.682 22.912-3.682 5.809 0 11.537.654 17.265 2.045s10.965 3.6 15.711 6.71c4.746 3.109 8.51 7.282 11.455 12.6 2.864 5.318 4.337 11.946 4.337 19.883v80.184h-27.166v-16.446h-.9c-1.719 3.355-4.092 6.464-7.201 9.328-3.109 2.864-6.955 5.237-11.619 6.955-4.828 1.718-10.229 2.536-16.529 2.536Zm7.364-20.701c5.646 0 10.556-1.145 14.729-3.354 4.173-2.291 7.364-5.237 9.655-9.001 2.292-3.763 3.355-7.854 3.355-12.273v-14.155c-.9.737-2.373 1.391-4.5 2.046-2.128.654-4.419 1.145-7.037 1.636-2.619.491-5.155.9-7.692 1.227-2.537.328-4.746.655-6.628.901-4.173.572-8.019 1.472-11.292 2.781-3.355 1.31-5.973 3.11-7.855 5.401-1.964 2.291-2.864 5.318-2.864 8.918 0 5.237 1.882 9.164 5.728 11.782 3.682 2.782 8.51 4.091 14.401 4.091Zm64.643 18.328V71.839h27.412v19.965h1.227c2.21-6.955 5.974-12.274 11.292-16.038 5.319-3.763 11.456-5.645 18.329-5.645 1.555 0 3.355.082 5.237.163 1.964.164 3.601.328 4.91.573v25.938c-1.227-.41-3.109-.819-5.646-1.146a58.814 58.814 0 0 0-7.446-.49c-5.155 0-9.738 1.145-13.829 3.354-4.091 2.209-7.282 5.236-9.655 9.164-2.373 3.927-3.519 8.427-3.519 13.5v70.448h-28.312ZM222.077 39.192l-8.019 125.923L137.387 0l84.69 39.192Zm-53.105 162.825-57.933 33.056-57.934-33.056 11.783-28.556h92.301l11.783 28.556ZM111.039 62.675l30.357 73.803H80.681l30.358-73.803ZM7.937 165.115 0 39.192 84.69 0 7.937 165.115Z\"\n          />\n          <path\n            fill=\"url(#c)\"\n            d=\"M388.676 191.625h30.849L363.31 31.828h-35.758l-56.215 159.797h30.848l13.174-39.356h60.061l13.256 39.356Zm-65.461-62.675 21.602-64.311h1.227l21.602 64.311h-44.431Zm126.831-7.527v70.202h-28.23V71.839h27.002v20.374h1.392c2.782-6.71 7.2-12.028 13.255-15.956 6.056-3.927 13.584-5.89 22.503-5.89 8.264 0 15.465 1.8 21.684 5.318 6.137 3.518 10.964 8.673 14.319 15.382 3.437 6.71 5.074 14.81 4.992 24.383v76.175h-28.23v-71.92c0-8.019-2.046-14.237-6.219-18.819-4.173-4.5-9.819-6.791-17.102-6.791-4.91 0-9.328 1.063-13.174 3.272-3.846 2.128-6.792 5.237-9.001 9.328-2.046 4.009-3.191 8.918-3.191 14.728ZM589.233 239c-10.147 0-18.82-1.391-26.103-4.091-7.282-2.7-13.092-6.382-17.511-10.964-4.418-4.582-7.528-9.655-9.164-15.219l25.448-6.136c1.145 2.372 2.782 4.663 4.991 6.954 2.209 2.291 5.155 4.255 8.837 5.81 3.683 1.554 8.428 2.291 14.074 2.291 8.019 0 14.647-1.964 19.884-5.81 5.237-3.845 7.856-10.227 7.856-19.064v-22.665h-1.391c-1.473 2.946-3.601 5.892-6.383 9.001-2.782 3.109-6.464 5.645-10.965 7.691-4.582 2.046-10.228 3.109-17.101 3.109-9.165 0-17.511-2.209-25.039-6.545-7.446-4.337-13.42-10.883-17.757-19.474-4.418-8.673-6.628-19.473-6.628-32.565 0-13.091 2.21-24.301 6.628-33.383 4.419-9.082 10.311-15.955 17.839-20.7 7.528-4.746 15.874-7.037 25.039-7.037 7.037 0 12.846 1.145 17.347 3.518 4.582 2.373 8.182 5.236 10.883 8.51 2.7 3.272 4.746 6.382 6.137 9.327h1.554v-19.8h27.821v121.749c0 10.228-2.454 18.737-7.364 25.447-4.91 6.709-11.538 11.7-20.048 15.055-8.509 3.355-18.165 4.991-28.884 4.991Zm.245-71.266c5.974 0 11.047-1.473 15.302-4.337 4.173-2.945 7.446-7.118 9.573-12.519 2.21-5.482 3.274-12.027 3.274-19.637 0-7.609-1.064-14.155-3.274-19.8-2.127-5.646-5.318-10.064-9.491-13.255-4.174-3.11-9.329-4.746-15.384-4.746s-11.537 1.636-15.792 4.91c-4.173 3.272-7.365 7.772-9.492 13.418-2.128 5.727-3.191 12.191-3.191 19.392 0 7.2 1.063 13.745 3.273 19.228 2.127 5.482 5.318 9.736 9.573 12.764 4.174 3.027 9.41 4.582 15.629 4.582Zm141.56-26.51V71.839h28.23v119.786h-27.412v-21.273h-1.227c-2.7 6.709-7.119 12.191-13.338 16.446-6.137 4.255-13.747 6.382-22.748 6.382-7.855 0-14.81-1.718-20.783-5.237-5.974-3.518-10.72-8.591-14.075-15.382-3.355-6.709-5.073-14.891-5.073-24.464V71.839h28.312v71.921c0 7.609 2.046 13.664 6.219 18.083 4.173 4.5 9.655 6.709 16.365 6.709 4.173 0 8.183-.982 12.111-3.028 3.927-2.045 7.118-5.072 9.655-9.082 2.537-4.091 3.764-9.164 3.764-15.218Zm65.707-109.395v159.796h-28.23V31.828h28.23Zm44.841 162.169c-7.61 0-14.402-1.391-20.457-4.091-6.055-2.7-10.883-6.791-14.32-12.109-3.518-5.319-5.237-11.946-5.237-19.801 0-6.791 1.228-12.355 3.765-16.773 2.536-4.419 5.891-7.937 10.228-10.637 4.337-2.618 9.164-4.664 14.647-6.055 5.4-1.391 11.046-2.373 16.856-3.027 7.037-.737 12.683-1.391 17.102-1.964 4.337-.573 7.528-1.555 9.574-2.782 1.963-1.309 3.027-3.273 3.027-5.973v-.491c0-5.891-1.718-10.391-5.237-13.664-3.518-3.191-8.51-4.828-15.056-4.828-6.955 0-12.356 1.473-16.447 4.5-4.009 3.028-6.71 6.546-8.183 10.719l-26.348-3.764c2.046-7.282 5.483-13.336 10.31-18.328 4.746-4.909 10.638-8.59 17.511-11.045 6.955-2.455 14.565-3.682 22.912-3.682 5.809 0 11.537.654 17.265 2.045s10.965 3.6 15.711 6.71c4.746 3.109 8.51 7.282 11.455 12.6 2.864 5.318 4.337 11.946 4.337 19.883v80.184h-27.166v-16.446h-.9c-1.719 3.355-4.092 6.464-7.201 9.328-3.109 2.864-6.955 5.237-11.619 6.955-4.828 1.718-10.229 2.536-16.529 2.536Zm7.364-20.701c5.646 0 10.556-1.145 14.729-3.354 4.173-2.291 7.364-5.237 9.655-9.001 2.292-3.763 3.355-7.854 3.355-12.273v-14.155c-.9.737-2.373 1.391-4.5 2.046-2.128.654-4.419 1.145-7.037 1.636-2.619.491-5.155.9-7.692 1.227-2.537.328-4.746.655-6.628.901-4.173.572-8.019 1.472-11.292 2.781-3.355 1.31-5.973 3.11-7.855 5.401-1.964 2.291-2.864 5.318-2.864 8.918 0 5.237 1.882 9.164 5.728 11.782 3.682 2.782 8.51 4.091 14.401 4.091Zm64.643 18.328V71.839h27.412v19.965h1.227c2.21-6.955 5.974-12.274 11.292-16.038 5.319-3.763 11.456-5.645 18.329-5.645 1.555 0 3.355.082 5.237.163 1.964.164 3.601.328 4.91.573v25.938c-1.227-.41-3.109-.819-5.646-1.146a58.814 58.814 0 0 0-7.446-.49c-5.155 0-9.738 1.145-13.829 3.354-4.091 2.209-7.282 5.236-9.655 9.164-2.373 3.927-3.519 8.427-3.519 13.5v70.448h-28.312ZM222.077 39.192l-8.019 125.923L137.387 0l84.69 39.192Zm-53.105 162.825-57.933 33.056-57.934-33.056 11.783-28.556h92.301l11.783 28.556ZM111.039 62.675l30.357 73.803H80.681l30.358-73.803ZM7.937 165.115 0 39.192 84.69 0 7.937 165.115Z\"\n          />\n        </g>\n        <defs>\n          <radialGradient\n            id=\"c\"\n            cx=\"0\"\n            cy=\"0\"\n            r=\"1\"\n            gradientTransform=\"rotate(118.122 171.182 60.81) scale(205.794)\"\n            gradientUnits=\"userSpaceOnUse\"\n          >\n            <stop stop-color=\"#FF41F8\" />\n            <stop offset=\".707\" stop-color=\"#FF41F8\" stop-opacity=\".5\" />\n            <stop offset=\"1\" stop-color=\"#FF41F8\" stop-opacity=\"0\" />\n          </radialGradient>\n          <linearGradient\n            id=\"b\"\n            x1=\"0\"\n            x2=\"982\"\n            y1=\"192\"\n            y2=\"192\"\n            gradientUnits=\"userSpaceOnUse\"\n          >\n            <stop stop-color=\"#F0060B\" />\n            <stop offset=\"0\" stop-color=\"#F0070C\" />\n            <stop offset=\".526\" stop-color=\"#CC26D5\" />\n            <stop offset=\"1\" stop-color=\"#7702FF\" />\n          </linearGradient>\n          <clipPath id=\"a\"><path fill=\"#fff\" d=\"M0 0h982v239H0z\" /></clipPath>\n        </defs>\n      </svg>\n      <h1>Hello, {{ title() }}</h1>\n      <p>Congratulations! Your app is running. 🎉</p>\n    </div>\n    <div class=\"divider\" role=\"separator\" aria-label=\"Divider\"></div>\n    <div class=\"right-side\">\n      <div class=\"pill-group\">\n        @for (item of [\n          { title: 'Explore the Docs', link: 'https://angular.dev' },\n          { title: 'Learn with Tutorials', link: 'https://angular.dev/tutorials' },\n          { title: 'Prompt and best practices for AI', link: 'https://angular.dev/ai/develop-with-ai'},\n          { title: 'CLI Docs', link: 'https://angular.dev/tools/cli' },\n          { title: 'Angular Language Service', link: 'https://angular.dev/tools/language-service' },\n          { title: 'Angular DevTools', link: 'https://angular.dev/tools/devtools' },\n        ]; track item.title) {\n          <a\n            class=\"pill\"\n            [href]=\"item.link\"\n            target=\"_blank\"\n            rel=\"noopener\"\n          >\n            <span>{{ item.title }}</span>\n            <svg\n              xmlns=\"http://www.w3.org/2000/svg\"\n              height=\"14\"\n              viewBox=\"0 -960 960 960\"\n              width=\"14\"\n              fill=\"currentColor\"\n            >\n              <path\n                d=\"M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h560v-280h80v280q0 33-23.5 56.5T760-120H200Zm188-212-56-56 372-372H560v-80h280v280h-80v-144L388-332Z\"\n              />\n            </svg>\n          </a>\n        }\n      </div>\n      <div class=\"social-links\">\n        <a\n          href=\"https://github.com/angular/angular\"\n          aria-label=\"Github\"\n          target=\"_blank\"\n          rel=\"noopener\"\n        >\n          <svg\n            width=\"25\"\n            height=\"24\"\n            viewBox=\"0 0 25 24\"\n            fill=\"none\"\n            xmlns=\"http://www.w3.org/2000/svg\"\n            alt=\"Github\"\n          >\n            <path\n              d=\"M12.3047 0C5.50634 0 0 5.50942 0 12.3047C0 17.7423 3.52529 22.3535 8.41332 23.9787C9.02856 24.0946 9.25414 23.7142 9.25414 23.3871C9.25414 23.0949 9.24389 22.3207 9.23876 21.2953C5.81601 22.0377 5.09414 19.6444 5.09414 19.6444C4.53427 18.2243 3.72524 17.8449 3.72524 17.8449C2.61064 17.082 3.81137 17.0973 3.81137 17.0973C5.04697 17.1835 5.69604 18.3647 5.69604 18.3647C6.79321 20.2463 8.57636 19.7029 9.27978 19.3881C9.39052 18.5924 9.70736 18.0499 10.0591 17.7423C7.32641 17.4347 4.45429 16.3765 4.45429 11.6618C4.45429 10.3185 4.9311 9.22133 5.72065 8.36C5.58222 8.04931 5.16694 6.79833 5.82831 5.10337C5.82831 5.10337 6.85883 4.77319 9.2121 6.36459C10.1965 6.09082 11.2424 5.95546 12.2883 5.94931C13.3342 5.95546 14.3801 6.09082 15.3644 6.36459C17.7023 4.77319 18.7328 5.10337 18.7328 5.10337C19.3942 6.79833 18.9789 8.04931 18.8559 8.36C19.6403 9.22133 20.1171 10.3185 20.1171 11.6618C20.1171 16.3888 17.2409 17.4296 14.5031 17.7321C14.9338 18.1012 15.3337 18.8559 15.3337 20.0084C15.3337 21.6552 15.3183 22.978 15.3183 23.3779C15.3183 23.7009 15.5336 24.0854 16.1642 23.9623C21.0871 22.3484 24.6094 17.7341 24.6094 12.3047C24.6094 5.50942 19.0999 0 12.3047 0Z\"\n            />\n          </svg>\n        </a>\n        <a\n          href=\"https://x.com/angular\"\n          aria-label=\"X\"\n          target=\"_blank\"\n          rel=\"noopener\"\n        >\n          <svg\n            width=\"24\"\n            height=\"24\"\n            viewBox=\"0 0 24 24\"\n            fill=\"none\"\n            xmlns=\"http://www.w3.org/2000/svg\"\n            alt=\"X\"\n          >\n            <path\n              d=\"M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z\"\n            />\n          </svg>\n        </a>\n        <a\n          href=\"https://www.youtube.com/channel/UCbn1OgGei-DV7aSRo_HaAiw\"\n          aria-label=\"Youtube\"\n          target=\"_blank\"\n          rel=\"noopener\"\n        >\n          <svg\n            width=\"29\"\n            height=\"20\"\n            viewBox=\"0 0 29 20\"\n            fill=\"none\"\n            xmlns=\"http://www.w3.org/2000/svg\"\n            alt=\"Youtube\"\n          >\n            <path\n              fill-rule=\"evenodd\"\n              clip-rule=\"evenodd\"\n              d=\"M27.4896 1.52422C27.9301 1.96749 28.2463 2.51866 28.4068 3.12258C29.0004 5.35161 29.0004 10 29.0004 10C29.0004 10 29.0004 14.6484 28.4068 16.8774C28.2463 17.4813 27.9301 18.0325 27.4896 18.4758C27.0492 18.9191 26.5 19.2389 25.8972 19.4032C23.6778 20 14.8068 20 14.8068 20C14.8068 20 5.93586 20 3.71651 19.4032C3.11363 19.2389 2.56449 18.9191 2.12405 18.4758C1.68361 18.0325 1.36732 17.4813 1.20683 16.8774C0.613281 14.6484 0.613281 10 0.613281 10C0.613281 10 0.613281 5.35161 1.20683 3.12258C1.36732 2.51866 1.68361 1.96749 2.12405 1.52422C2.56449 1.08095 3.11363 0.76113 3.71651 0.596774C5.93586 0 14.8068 0 14.8068 0C14.8068 0 23.6778 0 25.8972 0.596774C26.5 0.76113 27.0492 1.08095 27.4896 1.52422ZM19.3229 10L11.9036 5.77905V14.221L19.3229 10Z\"\n            />\n          </svg>\n        </a>\n      </div>\n    </div>\n  </div>\n</main>\n\n<!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->\n<!-- * * * * * * * * * * * The content above * * * * * * * * * * * * -->\n<!-- * * * * * * * * * * is only a placeholder * * * * * * * * * * * -->\n<!-- * * * * * * * * * * and can be replaced.  * * * * * * * * * * * -->\n<!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->\n<!-- * * * * * * * * * * End of Placeholder  * * * * * * * * * * * * -->\n<!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->\n\n\n<router-outlet />\n"
+            "templateData": "<div class=\"weather-app-container\">\n  <h1>Weather App</h1>\n  <p class=\"subtitle\">Real-time weather forecast for your location</p>\n  <weather-widget\n    [enableSearch]=\"false\"\n    [useRealData]=\"false\"\n    [initialCity]=\"'The Hague'\"\n    [weatherData]=\"weatherData\"\n    [unit]=\"'C'\"\n    [theme]=\"'dark'\"\n    [size]=\"'small'\">\n  </weather-widget>\n</div>\n\n<router-outlet />\n"
         },
         {
             "name": "ButtonComponent",
@@ -1135,7 +1241,7 @@
         },
         {
             "name": "WeatherWidgetComponent",
-            "id": "component-WeatherWidgetComponent-4feedb40e9852d2a7d133b81b540de9983363ef68e28b59f5aa51388346c6d1c5dd438bfd4384fb1ecfbf211c4cefb046d569a9796d8cfb175df230a7fbd2d89",
+            "id": "component-WeatherWidgetComponent-fc0a4dcf6eac2139c87a1d55577cfac18a40b39b3ff4346f2e2a0642057135eb13a7809cb7a6a9401038588e9d7b46a1de9f08122fd7a0f1db504f539add65aa",
             "file": "src/stories/weather-widget/weather-widget.component.ts",
             "encapsulation": [],
             "entryComponents": [],
@@ -1164,7 +1270,7 @@
                     "deprecationMessage": "",
                     "rawdescription": "\nEnable search functionality",
                     "description": "<p>Enable search functionality</p>\n",
-                    "line": 88,
+                    "line": 87,
                     "type": "boolean",
                     "decorators": []
                 },
@@ -1175,7 +1281,7 @@
                     "deprecationMessage": "",
                     "rawdescription": "\nInitial city to load",
                     "description": "<p>Initial city to load</p>\n",
-                    "line": 92,
+                    "line": 91,
                     "type": "string",
                     "decorators": []
                 },
@@ -1186,7 +1292,7 @@
                     "deprecationMessage": "",
                     "rawdescription": "\nWidget size",
                     "description": "<p>Widget size</p>\n",
-                    "line": 123,
+                    "line": 122,
                     "type": "\"small\" | \"medium\" | \"large\"",
                     "decorators": []
                 },
@@ -1197,7 +1303,7 @@
                     "deprecationMessage": "",
                     "rawdescription": "\nTheme of the widget",
                     "description": "<p>Theme of the widget</p>\n",
-                    "line": 119,
+                    "line": 118,
                     "type": "\"light\" | \"dark\" | \"gradient\"",
                     "decorators": []
                 },
@@ -1208,7 +1314,7 @@
                     "deprecationMessage": "",
                     "rawdescription": "\nTemperature unit (C or F)",
                     "description": "<p>Temperature unit (C or F)</p>\n",
-                    "line": 111,
+                    "line": 110,
                     "type": "\"C\" | \"F\"",
                     "decorators": []
                 },
@@ -1219,29 +1325,29 @@
                     "deprecationMessage": "",
                     "rawdescription": "\nUse real API data (if false, uses mock data)",
                     "description": "<p>Use real API data (if false, uses mock data)</p>\n",
-                    "line": 96,
+                    "line": 95,
                     "type": "boolean",
                     "decorators": []
                 },
                 {
                     "name": "weatherData",
-                    "defaultValue": "{\n    location: 'The Hague',\n    temperature: 72,\n    condition: 'Partly Cloudy',\n    humidity: 65,\n    windSpeed: 12,\n    icon: '⛅',\n  }",
+                    "defaultValue": "{\n    location: 'The Hague',\n    temperature: 5,\n    condition: 'Partly Cloudy',\n    humidity: 65,\n    windSpeed: 12,\n    icon: '⛅',\n  }",
                     "deprecated": false,
                     "deprecationMessage": "",
                     "rawdescription": "\nWeather data to display",
                     "description": "<p>Weather data to display</p>\n",
-                    "line": 100,
+                    "line": 99,
                     "type": "WeatherData",
                     "decorators": []
                 },
                 {
                     "name": "windUnit",
-                    "defaultValue": "'mph'",
+                    "defaultValue": "'km/h'",
                     "deprecated": false,
                     "deprecationMessage": "",
                     "rawdescription": "\nWind speed unit",
                     "description": "<p>Wind speed unit</p>\n",
-                    "line": 115,
+                    "line": 114,
                     "type": "\"mph\" | \"km/h\"",
                     "decorators": []
                 }
@@ -1257,7 +1363,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 125
+                    "line": 124
                 },
                 {
                     "name": "error",
@@ -1268,7 +1374,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 128
+                    "line": 127
                 },
                 {
                     "name": "lastSearchedCity",
@@ -1279,7 +1385,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 129
+                    "line": 128
                 },
                 {
                     "name": "loading",
@@ -1290,7 +1396,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 127
+                    "line": 126
                 },
                 {
                     "name": "searchCity",
@@ -1301,7 +1407,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 126
+                    "line": 125
                 },
                 {
                     "name": "weatherService",
@@ -1312,7 +1418,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 84,
+                    "line": 83,
                     "modifierKind": [
                         123
                     ]
@@ -1325,7 +1431,7 @@
                     "optional": false,
                     "returnType": "any",
                     "typeParameters": [],
-                    "line": 156,
+                    "line": 155,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "rawdescription": "\n\nGet weather for current location using geolocation\n",
@@ -1347,7 +1453,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 230,
+                    "line": 229,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "rawdescription": "\n\nHandle API errors\n",
@@ -1380,7 +1486,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 214,
+                    "line": 213,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "rawdescription": "\n\nHandle successful weather data response\n",
@@ -1413,7 +1519,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 198,
+                    "line": 197,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "rawdescription": "\n\nLoad weather data from API\n",
@@ -1439,7 +1545,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 131,
+                    "line": 130,
                     "deprecated": false,
                     "deprecationMessage": ""
                 },
@@ -1449,7 +1555,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 178,
+                    "line": 177,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "rawdescription": "\n\nRefresh current weather data\n",
@@ -1461,7 +1567,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 187,
+                    "line": 186,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "rawdescription": "\n\nRetry after error\n",
@@ -1473,7 +1579,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 145,
+                    "line": 144,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "rawdescription": "\n\nSearch weather by city name\n",
@@ -1485,7 +1591,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 239,
+                    "line": 238,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "rawdescription": "\n\nUpdate current date display\n",
@@ -1508,16 +1614,12 @@
                 {
                     "name": "FormsModule",
                     "type": "module"
-                },
-                {
-                    "name": "HttpClientModule",
-                    "type": "module"
                 }
             ],
             "description": "",
             "rawdescription": "\n",
             "type": "component",
-            "sourceCode": "import { CommonModule } from '@angular/common';\nimport { Component, Input, OnInit, inject } from '@angular/core';\nimport { FormsModule } from '@angular/forms';\nimport { HttpClientModule } from '@angular/common/http';\nimport { WeatherService, WeatherResponse } from './weather.service';\n\nexport interface WeatherData {\n  location: string;\n  temperature: number;\n  condition: string;\n  humidity: number;\n  windSpeed: number;\n  icon: string;\n}\n\n@Component({\n  selector: 'weather-widget',\n  standalone: true,\n  imports: [CommonModule, FormsModule, HttpClientModule],\n  providers: [WeatherService],\n  template: `\n    <div class=\"weather-widget\" [ngClass]=\"themeClass\">\n      <!-- Search Bar -->\n      <div class=\"weather-search\" *ngIf=\"enableSearch\">\n        <input\n          type=\"text\"\n          [(ngModel)]=\"searchCity\"\n          (keyup.enter)=\"searchWeather()\"\n          placeholder=\"Enter city name...\"\n          class=\"search-input\"\n        />\n        <button (click)=\"searchWeather()\" class=\"search-button\">🔍</button>\n        <button (click)=\"getCurrentLocationWeather()\" class=\"location-button\" title=\"Use my location\">📍</button>\n      </div>\n\n      <!-- Loading State -->\n      <div *ngIf=\"loading\" class=\"weather-loading\">\n        <div class=\"spinner\"></div>\n        <p>Loading weather data...</p>\n      </div>\n\n      <!-- Error State -->\n      <div *ngIf=\"error && !loading\" class=\"weather-error\">\n        <span class=\"error-icon\">⚠️</span>\n        <p>{{ error }}</p>\n        <button (click)=\"retry()\" class=\"retry-button\">Try Again</button>\n      </div>\n\n      <!-- Weather Content -->\n      <div *ngIf=\"!loading && !error\" class=\"weather-content\">\n        <div class=\"weather-header\">\n          <h2 class=\"location\">{{ weatherData.location }}</h2>\n          <span class=\"date\">{{ currentDate }}</span>\n        </div>\n\n        <div class=\"weather-main\">\n          <div class=\"weather-icon\">{{ weatherData.icon }}</div>\n          <div class=\"temperature\">{{ weatherData.temperature }}°{{ unit }}</div>\n        </div>\n\n        <div class=\"weather-condition\">{{ weatherData.condition }}</div>\n\n        <div class=\"weather-details\">\n          <div class=\"detail-item\">\n            <span class=\"detail-label\">Humidity</span>\n            <span class=\"detail-value\">{{ weatherData.humidity }}%</span>\n          </div>\n          <div class=\"detail-item\">\n            <span class=\"detail-label\">Wind Speed</span>\n            <span class=\"detail-value\">{{ weatherData.windSpeed }} {{ windUnit }}</span>\n          </div>\n        </div>\n\n        <!-- Refresh Button -->\n        <button *ngIf=\"enableSearch\" (click)=\"refreshWeather()\" class=\"refresh-button\" title=\"Refresh\">\n          🔄\n        </button>\n      </div>\n    </div>\n  `,\n  styleUrls: ['./weather-widget.css'],\n})\nexport class WeatherWidgetComponent implements OnInit {\n  private weatherService = inject(WeatherService);\n\n  /** Enable search functionality */\n  @Input()\n  enableSearch: boolean = false;\n\n  /** Initial city to load */\n  @Input()\n  initialCity: string = 'The Hague';\n\n  /** Use real API data (if false, uses mock data) */\n  @Input()\n  useRealData: boolean = false;\n\n  /** Weather data to display */\n  @Input()\n  weatherData: WeatherData = {\n    location: 'The Hague',\n    temperature: 72,\n    condition: 'Partly Cloudy',\n    humidity: 65,\n    windSpeed: 12,\n    icon: '⛅',\n  };\n\n  /** Temperature unit (C or F) */\n  @Input()\n  unit: 'C' | 'F' = 'F';\n\n  /** Wind speed unit */\n  @Input()\n  windUnit: 'mph' | 'km/h' = 'mph';\n\n  /** Theme of the widget */\n  @Input()\n  theme: 'light' | 'dark' | 'gradient' = 'light';\n\n  /** Widget size */\n  @Input()\n  size: 'small' | 'medium' | 'large' = 'medium';\n\n  currentDate: string = '';\n  searchCity: string = '';\n  loading: boolean = false;\n  error: string = '';\n  lastSearchedCity: string = '';\n\n  ngOnInit() {\n    this.updateCurrentDate();\n    this.searchCity = this.initialCity;\n    this.lastSearchedCity = this.initialCity;\n\n    // Load weather data if real API is enabled\n    if (this.useRealData && this.enableSearch) {\n      this.loadWeather(this.initialCity);\n    }\n  }\n\n  /**\n   * Search weather by city name\n   */\n  searchWeather() {\n    if (!this.searchCity.trim()) {\n      this.error = 'Please enter a city name';\n      return;\n    }\n    this.loadWeather(this.searchCity.trim());\n  }\n\n  /**\n   * Get weather for current location using geolocation\n   */\n  async getCurrentLocationWeather() {\n    this.loading = true;\n    this.error = '';\n\n    try {\n      const coords = await this.weatherService.getCurrentPosition();\n      const units = this.unit === 'C' ? 'metric' : 'imperial';\n\n      this.weatherService.getWeatherByCoordinates(coords.latitude, coords.longitude, units)\n        .subscribe({\n          next: (data) => this.handleWeatherData(data),\n          error: (err) => this.handleError(err)\n        });\n    } catch (err: any) {\n      this.loading = false;\n      this.error = err.message || 'Unable to get your location';\n    }\n  }\n\n  /**\n   * Refresh current weather data\n   */\n  refreshWeather() {\n    if (this.lastSearchedCity) {\n      this.loadWeather(this.lastSearchedCity);\n    }\n  }\n\n  /**\n   * Retry after error\n   */\n  retry() {\n    if (this.lastSearchedCity) {\n      this.loadWeather(this.lastSearchedCity);\n    } else {\n      this.error = '';\n    }\n  }\n\n  /**\n   * Load weather data from API\n   */\n  private loadWeather(city: string) {\n    this.loading = true;\n    this.error = '';\n    this.lastSearchedCity = city;\n\n    const units = this.unit === 'C' ? 'metric' : 'imperial';\n\n    this.weatherService.getWeatherByCity(city, units).subscribe({\n      next: (data) => this.handleWeatherData(data),\n      error: (err) => this.handleError(err)\n    });\n  }\n\n  /**\n   * Handle successful weather data response\n   */\n  private handleWeatherData(data: WeatherResponse) {\n    this.weatherData = {\n      location: data.location,\n      temperature: data.temperature,\n      condition: data.condition,\n      humidity: data.humidity,\n      windSpeed: data.windSpeed,\n      icon: data.icon\n    };\n    this.loading = false;\n    this.error = '';\n  }\n\n  /**\n   * Handle API errors\n   */\n  private handleError(err: any) {\n    this.loading = false;\n    this.error = err.message || 'Failed to load weather data';\n    console.error('Weather widget error:', err);\n  }\n\n  /**\n   * Update current date display\n   */\n  private updateCurrentDate() {\n    this.currentDate = new Date().toLocaleDateString('en-US', {\n      weekday: 'long',\n      year: 'numeric',\n      month: 'long',\n      day: 'numeric',\n    });\n  }\n\n  get themeClass(): string {\n    return `weather-widget--${this.theme} weather-widget--${this.size}`;\n  }\n}\n",
+            "sourceCode": "import { CommonModule } from '@angular/common';\nimport { Component, Input, OnInit, inject } from '@angular/core';\nimport { FormsModule } from '@angular/forms';\nimport { WeatherService, WeatherResponse } from './weather.service';\n\nexport interface WeatherData {\n  location: string;\n  temperature: number;\n  condition: string;\n  humidity: number;\n  windSpeed: number;\n  icon: string;\n}\n\n@Component({\n  selector: 'weather-widget',\n  standalone: true,\n  imports: [CommonModule, FormsModule],\n  providers: [WeatherService],\n  template: `\n    <div class=\"weather-widget\" [ngClass]=\"themeClass\">\n      <!-- Search Bar -->\n      <div class=\"weather-search\" *ngIf=\"enableSearch\">\n        <input\n          type=\"text\"\n          [(ngModel)]=\"searchCity\"\n          (keyup.enter)=\"searchWeather()\"\n          placeholder=\"Enter city name...\"\n          class=\"search-input\"\n        />\n        <button (click)=\"searchWeather()\" class=\"search-button\">🔍</button>\n        <button (click)=\"getCurrentLocationWeather()\" class=\"location-button\" title=\"Use my location\">📍</button>\n      </div>\n\n      <!-- Loading State -->\n      <div *ngIf=\"loading\" class=\"weather-loading\">\n        <div class=\"spinner\"></div>\n        <p>Loading weather data...</p>\n      </div>\n\n      <!-- Error State -->\n      <div *ngIf=\"error && !loading\" class=\"weather-error\">\n        <span class=\"error-icon\">⚠️</span>\n        <p>{{ error }}</p>\n        <button (click)=\"retry()\" class=\"retry-button\">Try Again</button>\n      </div>\n\n      <!-- Weather Content -->\n      <div *ngIf=\"!loading && !error\" class=\"weather-content\">\n        <div class=\"weather-header\">\n          <h2 class=\"location\">{{ weatherData.location }}</h2>\n          <span class=\"date\">{{ currentDate }}</span>\n        </div>\n\n        <div class=\"weather-main\">\n          <div class=\"weather-icon\">{{ weatherData.icon }}</div>\n          <div class=\"temperature\">{{ weatherData.temperature }}°{{ unit }}</div>\n        </div>\n\n        <div class=\"weather-condition\">{{ weatherData.condition }}</div>\n\n        <div class=\"weather-details\">\n          <div class=\"detail-item\">\n            <span class=\"detail-label\">Humidity</span>\n            <span class=\"detail-value\">{{ weatherData.humidity }}%</span>\n          </div>\n          <div class=\"detail-item\">\n            <span class=\"detail-label\">Wind Speed</span>\n            <span class=\"detail-value\">{{ weatherData.windSpeed }} {{ windUnit }}</span>\n          </div>\n        </div>\n\n        <!-- Refresh Button -->\n        <button *ngIf=\"enableSearch\" (click)=\"refreshWeather()\" class=\"refresh-button\" title=\"Refresh\">\n          🔄\n        </button>\n      </div>\n    </div>\n  `,\n  styleUrls: ['./weather-widget.css'],\n})\nexport class WeatherWidgetComponent implements OnInit {\n  private weatherService = inject(WeatherService);\n\n  /** Enable search functionality */\n  @Input()\n  enableSearch: boolean = false;\n\n  /** Initial city to load */\n  @Input()\n  initialCity: string = 'The Hague';\n\n  /** Use real API data (if false, uses mock data) */\n  @Input()\n  useRealData: boolean = false;\n\n  /** Weather data to display */\n  @Input()\n  weatherData: WeatherData = {\n    location: 'The Hague',\n    temperature: 5,\n    condition: 'Partly Cloudy',\n    humidity: 65,\n    windSpeed: 12,\n    icon: '⛅',\n  };\n\n  /** Temperature unit (C or F) */\n  @Input()\n  unit: 'C' | 'F' = 'F';\n\n  /** Wind speed unit */\n  @Input()\n  windUnit: 'mph' | 'km/h' = 'km/h';\n\n  /** Theme of the widget */\n  @Input()\n  theme: 'light' | 'dark' | 'gradient' = 'light';\n\n  /** Widget size */\n  @Input()\n  size: 'small' | 'medium' | 'large' = 'medium';\n\n  currentDate: string = '';\n  searchCity: string = '';\n  loading: boolean = false;\n  error: string = '';\n  lastSearchedCity: string = '';\n\n  ngOnInit() {\n    this.updateCurrentDate();\n    this.searchCity = this.initialCity;\n    this.lastSearchedCity = this.initialCity;\n\n    // Load weather data if real API is enabled\n    if (this.useRealData && this.enableSearch) {\n      this.loadWeather(this.initialCity);\n    }\n  }\n\n  /**\n   * Search weather by city name\n   */\n  searchWeather() {\n    if (!this.searchCity.trim()) {\n      this.error = 'Please enter a city name';\n      return;\n    }\n    this.loadWeather(this.searchCity.trim());\n  }\n\n  /**\n   * Get weather for current location using geolocation\n   */\n  async getCurrentLocationWeather() {\n    this.loading = true;\n    this.error = '';\n\n    try {\n      const coords = await this.weatherService.getCurrentPosition();\n      const units = this.unit === 'C' ? 'metric' : 'imperial';\n\n      this.weatherService.getWeatherByCoordinates(coords.latitude, coords.longitude, units)\n        .subscribe({\n          next: (data) => this.handleWeatherData(data),\n          error: (err) => this.handleError(err)\n        });\n    } catch (err: any) {\n      this.loading = false;\n      this.error = err.message || 'Unable to get your location';\n    }\n  }\n\n  /**\n   * Refresh current weather data\n   */\n  refreshWeather() {\n    if (this.lastSearchedCity) {\n      this.loadWeather(this.lastSearchedCity);\n    }\n  }\n\n  /**\n   * Retry after error\n   */\n  retry() {\n    if (this.lastSearchedCity) {\n      this.loadWeather(this.lastSearchedCity);\n    } else {\n      this.error = '';\n    }\n  }\n\n  /**\n   * Load weather data from API\n   */\n  private loadWeather(city: string) {\n    this.loading = true;\n    this.error = '';\n    this.lastSearchedCity = city;\n\n    const units = this.unit === 'C' ? 'metric' : 'imperial';\n\n    this.weatherService.getWeatherByCity(city, units).subscribe({\n      next: (data) => this.handleWeatherData(data),\n      error: (err) => this.handleError(err)\n    });\n  }\n\n  /**\n   * Handle successful weather data response\n   */\n  private handleWeatherData(data: WeatherResponse) {\n    this.weatherData = {\n      location: data.location,\n      temperature: data.temperature,\n      condition: data.condition,\n      humidity: data.humidity,\n      windSpeed: data.windSpeed,\n      icon: data.icon\n    };\n    this.loading = false;\n    this.error = '';\n  }\n\n  /**\n   * Handle API errors\n   */\n  private handleError(err: any) {\n    this.loading = false;\n    this.error = err.message || 'Failed to load weather data';\n    console.error('Weather widget error:', err);\n  }\n\n  /**\n   * Update current date display\n   */\n  private updateCurrentDate() {\n    this.currentDate = new Date().toLocaleDateString('en-US', {\n      weekday: 'long',\n      year: 'numeric',\n      month: 'long',\n      day: 'numeric',\n    });\n  }\n\n  get themeClass(): string {\n    return `weather-widget--${this.theme} weather-widget--${this.size}`;\n  }\n}\n",
             "assetsDirs": [],
             "styleUrlsData": [
                 {
@@ -1537,7 +1639,7 @@
                         "name": "themeClass",
                         "type": "string",
                         "returnType": "string",
-                        "line": 248
+                        "line": 247
                     }
                 }
             }
@@ -1564,7 +1666,7 @@
                 "deprecated": false,
                 "deprecationMessage": "",
                 "type": "object",
-                "defaultValue": "{\n  production: true,\n\n  // OpenWeatherMap API Configuration\n  weatherApi: {\n    key: 'YOUR_OPENWEATHERMAP_API_KEY', // Replace with your API key\n    baseUrl: 'https://api.openweathermap.org/data/2.5',\n  },\n\n  // For production, consider setting up a backend proxy\n  // to hide your API key and avoid CORS issues\n  corsProxy: 'https://api.allorigins.win/raw?url=',\n\n  useProxy: false,\n}"
+                "defaultValue": "{\n  production: true,\n\n  // OpenWeatherMap API Configuration\n  weatherApi: {\n    key: '9a755e38ff059806bf283e3174fdeae7', // Replace with your API key\n    baseUrl: 'https://api.openweathermap.org/data/2.5',\n  },\n\n  // For production, consider setting up a backend proxy\n  // to hide your API key and avoid CORS issues\n  corsProxy: 'https://api.allorigins.win/raw?url=',\n\n  useProxy: false,\n}"
             },
             {
                 "name": "environment",
@@ -1574,7 +1676,7 @@
                 "deprecated": false,
                 "deprecationMessage": "",
                 "type": "object",
-                "defaultValue": "{\n  production: false,\n\n  // OpenWeatherMap API Configuration\n  // Get your free API key at: https://openweathermap.org/api\n  weatherApi: {\n    key: 'YOUR_OPENWEATHERMAP_API_KEY', // Replace with your API key\n    baseUrl: 'https://api.openweathermap.org/data/2.5',\n  },\n\n  // CORS Proxy Configuration\n  // Options:\n  // 1. https://api.allorigins.win/raw?url= (free, no auth required)\n  // 2. https://corsproxy.io/? (free, no auth required)\n  // 3. Deploy your own: https://github.com/Rob--W/cors-anywhere\n  corsProxy: 'https://api.allorigins.win/raw?url=',\n\n  // Alternative: Use Angular proxy configuration (recommended for development)\n  // See proxy.conf.json\n  useProxy: false,\n}"
+                "defaultValue": "{\n  production: false,\n\n  // OpenWeatherMap API Configuration\n  // Get your free API key at: https://openweathermap.org/api\n  weatherApi: {\n    key: '9a755e38ff059806bf283e3174fdeae7', // Replace with your API key\n    baseUrl: 'https://api.openweathermap.org/data/2.5',\n  },\n\n  // CORS Proxy Configuration\n  // Options:\n  // 1. https://api.allorigins.win/raw?url= (free, no auth required)\n  // 2. https://corsproxy.io/? (free, no auth required)\n  // 3. Deploy your own: https://github.com/Rob--W/cors-anywhere\n  corsProxy: 'https://api.allorigins.win/raw?url=',\n\n  // Alternative: Use Angular proxy configuration (recommended for development)\n  // See proxy.conf.json\n  useProxy: false,\n}"
             },
             {
                 "name": "routes",
@@ -1612,7 +1714,7 @@
                     "deprecated": false,
                     "deprecationMessage": "",
                     "type": "object",
-                    "defaultValue": "{\n  production: true,\n\n  // OpenWeatherMap API Configuration\n  weatherApi: {\n    key: 'YOUR_OPENWEATHERMAP_API_KEY', // Replace with your API key\n    baseUrl: 'https://api.openweathermap.org/data/2.5',\n  },\n\n  // For production, consider setting up a backend proxy\n  // to hide your API key and avoid CORS issues\n  corsProxy: 'https://api.allorigins.win/raw?url=',\n\n  useProxy: false,\n}"
+                    "defaultValue": "{\n  production: true,\n\n  // OpenWeatherMap API Configuration\n  weatherApi: {\n    key: '9a755e38ff059806bf283e3174fdeae7', // Replace with your API key\n    baseUrl: 'https://api.openweathermap.org/data/2.5',\n  },\n\n  // For production, consider setting up a backend proxy\n  // to hide your API key and avoid CORS issues\n  corsProxy: 'https://api.allorigins.win/raw?url=',\n\n  useProxy: false,\n}"
                 }
             ],
             "src/environments/environment.ts": [
@@ -1624,7 +1726,7 @@
                     "deprecated": false,
                     "deprecationMessage": "",
                     "type": "object",
-                    "defaultValue": "{\n  production: false,\n\n  // OpenWeatherMap API Configuration\n  // Get your free API key at: https://openweathermap.org/api\n  weatherApi: {\n    key: 'YOUR_OPENWEATHERMAP_API_KEY', // Replace with your API key\n    baseUrl: 'https://api.openweathermap.org/data/2.5',\n  },\n\n  // CORS Proxy Configuration\n  // Options:\n  // 1. https://api.allorigins.win/raw?url= (free, no auth required)\n  // 2. https://corsproxy.io/? (free, no auth required)\n  // 3. Deploy your own: https://github.com/Rob--W/cors-anywhere\n  corsProxy: 'https://api.allorigins.win/raw?url=',\n\n  // Alternative: Use Angular proxy configuration (recommended for development)\n  // See proxy.conf.json\n  useProxy: false,\n}"
+                    "defaultValue": "{\n  production: false,\n\n  // OpenWeatherMap API Configuration\n  // Get your free API key at: https://openweathermap.org/api\n  weatherApi: {\n    key: '9a755e38ff059806bf283e3174fdeae7', // Replace with your API key\n    baseUrl: 'https://api.openweathermap.org/data/2.5',\n  },\n\n  // CORS Proxy Configuration\n  // Options:\n  // 1. https://api.allorigins.win/raw?url= (free, no auth required)\n  // 2. https://corsproxy.io/? (free, no auth required)\n  // 3. Deploy your own: https://github.com/Rob--W/cors-anywhere\n  corsProxy: 'https://api.allorigins.win/raw?url=',\n\n  // Alternative: Use Angular proxy configuration (recommended for development)\n  // See proxy.conf.json\n  useProxy: false,\n}"
                 }
             ],
             "src/app/app.routes.ts": [
@@ -1650,7 +1752,7 @@
         "children": []
     },
     "coverage": {
-        "count": 15,
+        "count": 14,
         "status": "low",
         "files": [
             {
@@ -1761,9 +1863,9 @@
                 "type": "injectable",
                 "linktype": "injectable",
                 "name": "WeatherService",
-                "coveragePercent": 61,
-                "coverageCount": "8/13",
-                "status": "good"
+                "coveragePercent": 50,
+                "coverageCount": "9/18",
+                "status": "medium"
             },
             {
                 "filePath": "src/stories/weather-widget/weather.service.ts",
