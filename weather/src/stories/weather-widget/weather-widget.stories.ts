@@ -25,8 +25,8 @@ const meta: Meta<WeatherWidgetComponent> = {
     },
     theme: {
       control: 'radio',
-      options: ['light', 'dark', 'gradient'],
-      description: 'Widget theme',
+      options: ['light', 'dark', 'gradient', 'high-contrast'],
+      description: 'Widget theme (high-contrast for accessibility)',
     },
     size: {
       control: 'radio',
@@ -58,7 +58,7 @@ const meta: Meta<WeatherWidgetComponent> = {
   parameters: {
     docs: {
       description: {
-        component: 'A weather widget component that displays current weather conditions. Can use mock data or fetch real data from OpenWeatherMap API. Supports search, geolocation, and multiple themes.',
+        component: 'A fully accessible weather widget component that displays current weather conditions. Features include ARIA labels, keyboard navigation, screen reader support, and WCAG AA compliant color contrast. Can use mock data or fetch real data from OpenWeatherMap API. Supports search, geolocation, and multiple themes including high-contrast mode.',
       },
     },
   },
@@ -278,6 +278,29 @@ export const GradientTheme: Story = {
 };
 
 /**
+ * High Contrast theme for accessibility
+ * WCAG AAA compliant with maximum color contrast
+ */
+export const HighContrastTheme: Story = {
+  args: {
+    weatherData: defaultWeatherData,
+    unit: 'C',
+    windUnit: 'km/h',
+    theme: 'high-contrast',
+    size: 'medium',
+    enableSearch: true,
+    useRealData: false,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'High contrast theme designed for users with visual impairments. Features black background with white text and yellow accents, meeting WCAG AAA standards (7:1+ contrast ratio). All interactive elements have enhanced focus indicators for keyboard navigation.',
+      },
+    },
+  },
+};
+
+/**
  * Small size variant
  */
 export const SmallSize: Story = {
@@ -434,6 +457,79 @@ export const Loading: Story = {
     docs: {
       description: {
         story: 'Demonstrates the loading state when fetching weather data',
+      },
+    },
+  },
+};
+
+/**
+ * Accessibility Features Showcase
+ * Demonstrates all accessibility enhancements
+ */
+export const AccessibilityShowcase: Story = {
+  args: {
+    weatherData: {
+      location: 'Amsterdam',
+      temperature: 18,
+      condition: 'Partly Cloudy',
+      humidity: 72,
+      windSpeed: 14,
+      icon: '⛅',
+    },
+    unit: 'C',
+    windUnit: 'km/h',
+    theme: 'high-contrast',
+    size: 'large',
+    enableSearch: true,
+    useRealData: false,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: `**Accessibility Features:**
+
+- ✅ **ARIA Labels**: All interactive elements have descriptive labels for screen readers
+- ✅ **Semantic HTML**: Uses proper landmarks (main, header, time) and roles
+- ✅ **Keyboard Navigation**: Full keyboard support with visible focus indicators
+- ✅ **Screen Reader Support**: Live regions announce weather updates, proper text alternatives for icons
+- ✅ **High Contrast**: WCAG AAA compliant (7:1+ contrast ratio)
+- ✅ **Visual Hierarchy**: Important information (temperature) is more prominent
+- ✅ **Last Updated**: Timestamp shows data freshness
+- ✅ **Focus Indicators**: Clear blue outlines for keyboard users
+
+**Try these:**
+- Tab through the controls to see focus indicators
+- Use a screen reader to hear descriptive labels
+- Switch to high-contrast theme for maximum visibility`,
+      },
+    },
+  },
+};
+
+/**
+ * Keyboard Navigation Demo
+ */
+export const KeyboardNavigationDemo: Story = {
+  args: {
+    weatherData: defaultWeatherData,
+    unit: 'C',
+    windUnit: 'km/h',
+    theme: 'dark',
+    size: 'medium',
+    enableSearch: true,
+    useRealData: false,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: `**Keyboard Navigation Guide:**
+
+- **Tab**: Move forward through interactive elements
+- **Shift + Tab**: Move backward through interactive elements
+- **Enter**: Activate buttons or submit search
+- **Space**: Activate buttons
+
+All interactive elements have visible focus indicators (blue outline) when navigated with keyboard.`,
       },
     },
   },
