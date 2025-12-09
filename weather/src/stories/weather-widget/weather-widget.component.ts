@@ -19,67 +19,105 @@ export interface WeatherData {
   imports: [CommonModule, FormsModule],
   providers: [WeatherService],
   template: `
-    <div class="weather-widget" [ngClass]="themeClass">
+    <main class="weather-widget" [ngClass]="themeClass" role="application" aria-label="Weather widget">
       <!-- Search Bar -->
-      <div class="weather-search" *ngIf="enableSearch">
+      <div class="weather-search" *ngIf="enableSearch" role="search">
+        <label for="city-search" class="visually-hidden">Search for a city</label>
         <input
+          id="city-search"
           type="text"
           [(ngModel)]="searchCity"
           (keyup.enter)="searchWeather()"
           placeholder="Enter city name..."
           class="search-input"
+          aria-label="City name"
+          aria-describedby="search-help"
         />
-        <button (click)="searchWeather()" class="search-button">🔍</button>
-        <button (click)="getCurrentLocationWeather()" class="location-button" title="Use my location">📍</button>
+        <span id="search-help" class="visually-hidden">Press enter or click search button to get weather</span>
+        <button
+          (click)="searchWeather()"
+          class="search-button"
+          aria-label="Search weather"
+          type="button">
+          <span aria-hidden="true">🔍</span>
+          <span class="button-text">Search</span>
+        </button>
+        <button
+          (click)="getCurrentLocationWeather()"
+          class="location-button"
+          aria-label="Use my current location"
+          type="button">
+          <span aria-hidden="true">📍</span>
+          <span class="button-text">Location</span>
+        </button>
       </div>
 
       <!-- Loading State -->
-      <div *ngIf="loading" class="weather-loading">
-        <div class="spinner"></div>
+      <div *ngIf="loading" class="weather-loading" role="status" aria-live="polite" aria-busy="true">
+        <div class="spinner" aria-hidden="true"></div>
         <p>Loading weather data...</p>
       </div>
 
       <!-- Error State -->
-      <div *ngIf="error && !loading" class="weather-error">
-        <span class="error-icon">⚠️</span>
+      <div *ngIf="error && !loading" class="weather-error" role="alert" aria-live="assertive">
+        <span class="error-icon" aria-hidden="true">⚠️</span>
         <p>{{ error }}</p>
-        <button (click)="retry()" class="retry-button">Try Again</button>
+        <button (click)="retry()" class="retry-button" type="button" aria-label="Try loading weather again">
+          Try Again
+        </button>
       </div>
 
       <!-- Weather Content -->
-      <div *ngIf="!loading && !error" class="weather-content">
-        <div class="weather-header">
-          <h2 class="location">{{ weatherData.location }}</h2>
-          <span class="date">{{ currentDate }}</span>
-        </div>
+      <div *ngIf="!loading && !error" class="weather-content" role="region" aria-live="polite" aria-label="Current weather information">
+        <header class="weather-header">
+          <h2 class="location" id="location-heading">{{ weatherData.location }}</h2>
+          <time class="date" [attr.datetime]="currentDateISO">{{ currentDate }}</time>
+        </header>
 
-        <div class="weather-main">
-          <div class="weather-icon">
+        <div class="weather-main" aria-labelledby="location-heading">
+          <div class="weather-icon" aria-hidden="true">
             <span *ngIf="iconType === 'emoji'">{{ weatherData.icon }}</span>
-            <img *ngIf="iconType === 'image'" [src]="weatherData.icon" [alt]="weatherData.condition" class="weather-icon-img" />
+            <img *ngIf="iconType === 'image'" [src]="weatherData.icon" [alt]="weatherData.condition + ' weather icon'" class="weather-icon-img" />
           </div>
-          <div class="temperature">{{ weatherData.temperature }}°{{ unit }}</div>
+          <div class="temperature" aria-label="Temperature: {{ weatherData.temperature }} degrees {{ unit === 'C' ? 'Celsius' : 'Fahrenheit' }}">
+            {{ weatherData.temperature }}°{{ unit }}
+          </div>
         </div>
 
-        <div class="weather-condition">{{ weatherData.condition }}</div>
+        <div class="weather-condition" role="text" aria-label="Current condition">{{ weatherData.condition }}</div>
 
-        <div class="weather-details">
-          <div class="detail-item">
-            <span class="detail-label">Humidity</span>
-            <span class="detail-value">{{ weatherData.humidity }}%</span>
+        <div class="weather-details" role="list" aria-label="Weather details">
+          <div class="detail-item" role="listitem">
+            <span class="detail-label" id="humidity-label">Humidity</span>
+            <span class="detail-value" aria-labelledby="humidity-label" aria-label="Humidity {{ weatherData.humidity }} percent">
+              {{ weatherData.humidity }}%
+            </span>
           </div>
-          <div class="detail-item">
-            <span class="detail-label">Wind Speed</span>
-            <span class="detail-value">{{ weatherData.windSpeed }} {{ windUnit }}</span>
+          <div class="detail-item" role="listitem">
+            <span class="detail-label" id="wind-label">Wind Speed</span>
+            <span class="detail-value" aria-labelledby="wind-label" aria-label="Wind speed {{ weatherData.windSpeed }} {{ windUnit }}">
+              {{ weatherData.windSpeed }} {{ windUnit }}
+            </span>
           </div>
+        </div>
+
+        <!-- Last Updated -->
+        <div *ngIf="lastUpdated" class="last-updated" aria-live="polite">
+          <small>Last updated: <time [attr.datetime]="lastUpdatedISO">{{ lastUpdated }}</time></small>
         </div>
 
         <!-- Refresh Button -->
-        <button *ngIf="enableSearch" (click)="refreshWeather()" class="refresh-button" title="Refresh">
-          🔄
+        <button
+          *ngIf="enableSearch"
+          (click)="refreshWeather()"
+          class="refresh-button"
+          type="button"
+          aria-label="Refresh weather data">
+          <span aria-hidden="true">🔄</span>
+          <span class="button-text">Refresh</span>
         </button>
       </div>
-    </div>
+    </main>
   `,
   styleUrls: ['./weather-widget.css'],
 })
@@ -119,7 +157,7 @@ export class WeatherWidgetComponent implements OnInit {
 
   /** Theme of the widget */
   @Input()
-  theme: 'light' | 'dark' | 'gradient' = 'light';
+  theme: 'light' | 'dark' | 'gradient' | 'high-contrast' = 'light';
 
   /** Widget size */
   @Input()
@@ -134,10 +172,13 @@ export class WeatherWidgetComponent implements OnInit {
   iconBasePath: string = 'assets/';
 
   currentDate: string = '';
+  currentDateISO: string = '';
   searchCity: string = '';
   loading: boolean = false;
   error: string = '';
   lastSearchedCity: string = '';
+  lastUpdated: string = '';
+  lastUpdatedISO: string = '';
 
   ngOnInit() {
     this.updateCurrentDate();
@@ -245,6 +286,7 @@ export class WeatherWidgetComponent implements OnInit {
     };
     this.loading = false;
     this.error = '';
+    this.updateLastUpdatedTime();
   }
 
   /**
@@ -282,12 +324,26 @@ export class WeatherWidgetComponent implements OnInit {
    * Update current date display
    */
   private updateCurrentDate() {
-    this.currentDate = new Date().toLocaleDateString('en-US', {
+    const now = new Date();
+    this.currentDate = now.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
+    this.currentDateISO = now.toISOString().split('T')[0];
+  }
+
+  /**
+   * Update last updated time display
+   */
+  private updateLastUpdatedTime() {
+    const now = new Date();
+    this.lastUpdated = now.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    this.lastUpdatedISO = now.toISOString();
   }
 
   get themeClass(): string {
