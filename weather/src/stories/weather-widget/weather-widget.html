@@ -32,22 +32,28 @@
   </div>
 
   <!-- Loading State -->
-  <div *ngIf="loading" class="weather-loading" role="status" aria-live="polite" aria-busy="true">
+  @if(loading) {
+    <div class="weather-loading" role="status" aria-live="polite" aria-busy="true">
     <div class="spinner" aria-hidden="true"></div>
     <p>Loading weather data...</p>
   </div>
+  }
 
   <!-- Error State -->
-  <div *ngIf="error && !loading" class="weather-error" role="alert" aria-live="assertive">
+  @if(error && !loading) {
+    <div class="weather-error" role="alert" aria-live="assertive">
     <span class="error-icon" aria-hidden="true">⚠️</span>
     <p>{{ error }}</p>
     <button (click)="retry()" class="retry-button" type="button" aria-label="Try loading weather again">
       Try Again
     </button>
   </div>
+  }
+
 
   <!-- Weather Content -->
-  <div *ngIf="!loading && !error" class="weather-content" role="region" aria-live="polite" aria-label="Current weather information">
+  @if(!loading && !error) {
+    <div class="weather-content" role="region" aria-live="polite" aria-label="Current weather information">
     <header class="weather-header">
       <h2 class="location" id="location-heading">{{ weatherData.location }}</h2>
       <time class="date" [attr.datetime]="currentDateISO">{{ currentDate }}</time>
@@ -55,8 +61,12 @@
 
     <div class="weather-main" aria-labelledby="location-heading">
       <div class="weather-icon" aria-hidden="true">
-        <span *ngIf="iconType === 'emoji'">{{ weatherData.icon }}</span>
-        <img *ngIf="iconType === 'image'" [src]="weatherData.icon" [alt]="weatherData.condition + ' weather icon'" class="weather-icon-img" />
+        @if(iconType === 'emoji') {
+          <span>{{ weatherData.icon }}</span>
+        }
+        @if(iconType === 'image') {
+           <img [src]="weatherData.icon" [alt]="weatherData.condition + ' weather icon'" class="weather-icon-img" />
+        }
       </div>
       <div class="temperature" aria-label="Temperature: {{ weatherData.temperature }} degrees {{ unit === 'C' ? 'Celsius' : 'Fahrenheit' }}">
         {{ weatherData.temperature }}°{{ unit }}
@@ -81,19 +91,24 @@
     </div>
 
     <!-- Last Updated -->
-    <div *ngIf="lastUpdated" class="last-updated" aria-live="polite">
-      <small>Last updated: <time [attr.datetime]="lastUpdatedISO">{{ lastUpdated }}</time></small>
-    </div>
+    @if(lastUpdated) {
+      <div class="last-updated" aria-live="polite">
+        <small>Last updated: <time [attr.datetime]="lastUpdatedISO">{{ lastUpdated }}</time></small>
+      </div>
+    }
 
     <!-- Refresh Button -->
-    <button
-      *ngIf="enableSearch"
-      (click)="refreshWeather()"
-      class="refresh-button"
-      type="button"
-      aria-label="Refresh weather data">
-      <span aria-hidden="true">🔄</span>
-      <span class="button-text">Refresh</span>
-    </button>
+    @if(enableSearch) {
+      <button
+        (click)="refreshWeather()"
+        class="refresh-button"
+        type="button"
+        aria-label="Refresh weather data">
+        <span aria-hidden="true">🔄</span>
+        <span class="button-text">Refresh</span>
+      </button>
+    }
   </div>
+  }
+
 </main>
